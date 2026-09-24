@@ -60,5 +60,10 @@
     "unplugin-swc": "^1.5.7",
     "@swc/core": "^1.13.5",
     "vitest": "^3.2.4"
+  },
+  "overrides": {
+    "@prisma/config": {
+      "deepmerge-ts": "^8.0.2"
+    }
   }
 }
