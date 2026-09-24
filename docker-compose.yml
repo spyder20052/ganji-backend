@@ -1,0 +1,21 @@
+# Démarrage local en une commande : docker compose up
+services:
+  db:
+    image: postgres:16-alpine
+    environment: { POSTGRES_USER: alafia, POSTGRES_PASSWORD: alafia, POSTGRES_DB: alafia }
+    ports: ['5432:5432']
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U alafia'], interval: 3s, retries: 20 }
+    volumes: [pgdata:/var/lib/postgresql/data]
+  api:
+    build: .
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      DATABASE_URL: postgresql://alafia:alafia@db:5432/alafia
+      DATABASE_URL_UNPOOLED: postgresql://alafia:alafia@db:5432/alafia
+      DEMO_MODE: 'true'
+      NODE_ENV: development
+      PORT: '4000'
+    ports: ['4000:4000']
+    command: sh -c "npx prisma db push --skip-generate && npx prisma db execute --file prisma/sql/audit-append-only.sql --schema prisma/schema.prisma && npx tsx prisma/seed.ts --if-empty && node dist/main.js"
+volumes:
+  pgdata:

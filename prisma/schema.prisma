@@ -1,0 +1,591 @@
+// Alafia : modèle de données aligné sur FHIR R4.
+// Chaque modèle indique la ressource FHIR équivalente.
+// Champs suffixés "Enc" : chiffrés au niveau applicatif (AES-256-GCM).
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+enum Role {
+  PATIENT
+  CAREGIVER
+  PRACTITIONER
+  NURSE
+  PHARMACIST
+  BLOOD_BANK
+  RELAY
+  MINISTRY
+  ADMIN
+}
+
+enum Lang {
+  fr
+  en
+  fon
+  yoruba
+  bariba
+  dendi
+}
+
+// ─── Référentiels réels ──────────────────────────────────────────────
+
+/// FHIR Location (département)
+model Department {
+  code        String    @id
+  name        String
+  chefLieu    String
+  lat         Float
+  lng         Float
+  population  Int?
+  communes    Commune[]
+}
+
+/// FHIR Location (commune)
+model Commune {
+  id             String      @id @default(uuid())
+  name           String      @unique
+  departmentCode String
+  department     Department  @relation(fields: [departmentCode], references: [code])
+  lat            Float
+  lng            Float
+  facilities     Facility[]
+  patients       Patient[]
+  alerts         HealthAlertCommune[]
+  reports        CommunityReport[]
+}
+
+/// FHIR Organization + Location
+model Facility {
+  id          String    @id @default(uuid())
+  name        String
+  shortName   String?
+  type        String
+  communeId   String
+  commune     Commune   @relation(fields: [communeId], references: [id])
+  lat         Float
+  lng         Float
+  services    String[]
+  open24h     Boolean   @default(false)
+  onDuty      Boolean   @default(false)
+  phone       String?
+  practitioners Practitioner[]
+  pharmacyStock PharmacyStock[]
+  bloodStock  BloodStock[]
+  bloodRequests BloodRequest[]
+
+  @@index([type])
+  @@index([lat, lng])
+}
+
+/// FHIR Medication
+model Medication {
+  id           String   @id @default(uuid())
+  dci          String
+  form         String
+  strength     String
+  atc          String?
+  category     String
+  priceFcfa    Int?
+  chronic      Boolean  @default(false)
+  stocks       PharmacyStock[]
+
+  @@index([dci])
+}
+
+// ─── Identité et comptes ─────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(uuid())
+  role          Role
+  displayName   String
+  npiHash       String?   @unique // HMAC-SHA256 du NPI, jamais le NPI en clair
+  npiLast4      String?
+  phone         String?   @unique
+  lang          Lang      @default(fr)
+  simpleMode    Boolean   @default(false)
+  demoPersona   String?   @unique
+  createdAt     DateTime  @default(now())
+  lastLoginAt   DateTime?
+  patient       Patient?
+  practitioner  Practitioner?
+  donor         Donor?
+  delegationsGiven    Delegation[] @relation("delegationCaregiver")
+  otps          OtpCode[]
+}
+
+model OtpCode {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+}
+
+/// FHIR Patient
+model Patient {
+  id               String    @id @default(uuid())
+  userId           String?   @unique
+  user             User?     @relation(fields: [userId], references: [id])
+  firstName        String
+  lastName         String
+  birthDate        DateTime
+  sex              String    // F | M
+  bloodGroup       String?
+  allergies        String[]
+  treatmentsEnc    String?   // traitements en cours (chiffré)
+  emergencyName    String?
+  emergencyPhone   String?
+  communeId        String?
+  commune          Commune?  @relation(fields: [communeId], references: [id])
+  qrToken          String    @unique @default(uuid())
+  provisionalId    String?   @unique // identifiant provisoire Alafia (sans NPI)
+  discreetMode     Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+
+  conditions       Condition[]
+  encounters       Encounter[]
+  observations     Observation[]
+  documents        DocumentRef[]
+  consents         Consent[]
+  delegations      Delegation[]
+  carePlans        CarePlan[]
+  reminders        Reminder[]
+  symptoms         SymptomLog[]
+  prescriptions    Prescription[]
+  teleExpertises   TeleExpertise[]
+  pregnancies      Pregnancy[]
+  immunizations    Immunization[]
+  bloodRequests    BloodRequest[]
+  careTeam         CareTeamMember[]
+  auditEvents      AuditEvent[]
+  children         Patient[] @relation("parentChild")
+  parentId         String?
+  parent           Patient?  @relation("parentChild", fields: [parentId], references: [id])
+}
+
+/// FHIR RelatedPerson : aidant agissant pour un patient
+model Delegation {
+  id          String    @id @default(uuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  caregiverId String
+  caregiver   User      @relation("delegationCaregiver", fields: [caregiverId], references: [id])
+  relation    String    // mère, fils, relais…
+  scopes      String[]  // summary, reminders, appointments, blood
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  @@unique([patientId, caregiverId])
+}
+
+/// FHIR Practitioner
+model Practitioner {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  title       String    // Dr, Inf., Pharm.
+  specialty   String
+  orderNumber String?
+  facilityId  String?
+  facility    Facility? @relation(fields: [facilityId], references: [id])
+  verifiedAt  DateTime?
+  careTeams   CareTeamMember[]
+}
+
+/// FHIR CareTeam
+model CareTeamMember {
+  id             String       @id @default(uuid())
+  patientId      String
+  patient        Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  practitionerId String
+  practitioner   Practitioner @relation(fields: [practitionerId], references: [id])
+  role           String
+  createdAt      DateTime     @default(now())
+
+  @@unique([patientId, practitionerId])
+}
+
+// ─── Consentement et traçabilité ─────────────────────────────────────
+
+/// FHIR Consent
+model Consent {
+  id          String    @id @default(uuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  granteeId   String?   // User.id du soignant (null tant que le QR n'est pas scanné)
+  granteeName String?
+  scopes      String[]  // summary, timeline, observations, documents, prescriptions, sensitive
+  source      String    // QR | CODE | TEAM | MANUAL
+  shareCode   String?   @unique // code court à 6 chiffres
+  shareToken  String?   @unique // jeton du QR
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  redeemedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([patientId, granteeId])
+}
+
+/// FHIR AuditEvent : table en ajout seul (trigger SQL refusant UPDATE et DELETE)
+model AuditEvent {
+  id         String   @id @default(uuid())
+  at         DateTime @default(now())
+  actorId    String?
+  actorName  String?
+  actorRole  String?
+  patientId  String?
+  patient    Patient? @relation(fields: [patientId], references: [id])
+  action     String   // READ | WRITE | BREAK_GLASS | CONSENT_GRANT | CONSENT_REVOKE | DENIED | LOGIN …
+  resource   String
+  reason     String?
+  allowed    Boolean  @default(true)
+  ip         String?
+
+  @@index([patientId, at])
+}
+
+// ─── Carnet de santé ─────────────────────────────────────────────────
+
+/// FHIR Condition
+model Condition {
+  id         String   @id @default(uuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  code       String?
+  labelEnc   String   // libellé chiffré
+  sensitive  Boolean  @default(false) // compartiment très sensible (VIH, santé mentale, SSR)
+  onsetAt    DateTime?
+  createdAt  DateTime @default(now())
+}
+
+/// FHIR Encounter
+model Encounter {
+  id           String   @id @default(uuid())
+  patientId    String
+  patient      Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  type         String   // CONSULTATION | HOSPITALISATION | TRANSFUSION | CHIMIOTHERAPIE | URGENCE | TELE_EXPERTISE | CPN | VACCINATION
+  date         DateTime
+  facilityName String?
+  authorName   String?
+  summaryEnc   String?
+  createdAt    DateTime @default(now())
+
+  @@index([patientId, date])
+}
+
+/// FHIR Observation
+model Observation {
+  id         String   @id @default(uuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  code       String   // HB | PLT | WBC | GLY | TA_SYS | TA_DIA | WEIGHT | HEIGHT
+  label      String
+  value      Float
+  unit       String
+  refLow     Float?
+  refHigh    Float?
+  date       DateTime
+  source     String   @default("labo")
+
+  @@index([patientId, code, date])
+}
+
+/// FHIR DocumentReference
+model DocumentRef {
+  id         String   @id @default(uuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  kind       String
+  title      String
+  mime       String
+  size       Int
+  dataB64    String   // démo : stocké en base, compressé ≤ 300 Ko ; prod : stockage objet + liens signés
+  createdAt  DateTime @default(now())
+}
+
+// ─── Parcours chronique ──────────────────────────────────────────────
+
+/// FHIR CarePlan
+model CarePlan {
+  id          String   @id @default(uuid())
+  patientId   String
+  patient     Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  title       String
+  protocol    String?
+  goals       String[]
+  steps       Json     // [{label, dueAt, done}]
+  createdAt   DateTime @default(now())
+}
+
+/// FHIR Appointment / CommunicationRequest
+model Reminder {
+  id          String    @id @default(uuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  kind        String    // MEDICATION | APPOINTMENT | LAB | CPN | VACCINE | DONATION
+  title       String
+  place       String?
+  dueAt       DateTime
+  channels    String[]  // APP | SMS | VOICE
+  sentAt      DateTime?
+  confirmedAt DateTime?
+
+  @@index([dueAt, sentAt])
+}
+
+/// FHIR Observation (auto-déclarée)
+model SymptomLog {
+  id         String   @id @default(uuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  symptom    String   // fever | pain | bleeding | fatigue | vomiting | breath
+  severity   Int      // 1..3
+  note       String?
+  alert      Boolean  @default(false)
+  at         DateTime @default(now())
+}
+
+// ─── Sang ────────────────────────────────────────────────────────────
+
+model BloodStock {
+  id         String   @id @default(uuid())
+  siteId     String
+  site       Facility @relation(fields: [siteId], references: [id])
+  product    String   // CGR | PLAQUETTES | PLASMA
+  bloodGroup String   // O+, O-, A+ …
+  units      Int
+  updatedAt  DateTime @updatedAt
+
+  @@unique([siteId, product, bloodGroup])
+}
+
+/// FHIR ServiceRequest
+model BloodRequest {
+  id            String    @id @default(uuid())
+  patientId     String
+  patient       Patient   @relation(fields: [patientId], references: [id])
+  requesterId   String
+  requesterName String
+  facilityId    String
+  facility      Facility  @relation(fields: [facilityId], references: [id])
+  product       String
+  bloodGroup    String
+  quantity      Int
+  urgency       String    // VITALE | URGENTE | PROGRAMMEE
+  neededBy      DateTime
+  status        String    @default("OUVERTE") // OUVERTE | DONNEURS_ALERTES | DONNEUR_TROUVE | SERVIE | ANNULEE
+  createdAt     DateTime  @default(now())
+  alerts        DonorAlert[]
+}
+
+model Donor {
+  id             String    @id @default(uuid())
+  userId         String?   @unique
+  user           User?     @relation(fields: [userId], references: [id])
+  firstName      String
+  phone          String    @unique
+  bloodGroup     String
+  sex            String
+  lat            Float
+  lng            Float
+  city           String
+  lastDonationAt DateTime?
+  available      Boolean   @default(true)
+  hasSmartphone  Boolean   @default(true)
+  lang           Lang      @default(fr)
+  donations      Int       @default(0)
+  alerts         DonorAlert[]
+
+  @@index([bloodGroup])
+}
+
+/// FHIR Communication
+model DonorAlert {
+  id          String    @id @default(uuid())
+  requestId   String
+  request     BloodRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  donorId     String
+  donor       Donor     @relation(fields: [donorId], references: [id])
+  distanceKm  Float
+  channel     String    // APP | SMS | VOICE
+  status      String    @default("ENVOYEE") // ENVOYEE | ACCEPTEE | REFUSEE | EXPIREE
+  respondedAt DateTime?
+  appointment DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([requestId, donorId])
+}
+
+// ─── Médicaments ─────────────────────────────────────────────────────
+
+model PharmacyStock {
+  id           String     @id @default(uuid())
+  pharmacyId   String
+  pharmacy     Facility   @relation(fields: [pharmacyId], references: [id])
+  medicationId String
+  medication   Medication @relation(fields: [medicationId], references: [id])
+  quantity     Int
+  priceFcfa    Int?
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([pharmacyId, medicationId])
+}
+
+/// FHIR MedicationRequest + MedicationDispense
+model Prescription {
+  id             String    @id @default(uuid())
+  patientId      String
+  patient        Patient   @relation(fields: [patientId], references: [id])
+  prescriberId   String
+  prescriberName String
+  items          Json      // [{medicationId, dci, dosage, duration, quantity}]
+  signature      String
+  status         String    @default("ACTIVE") // ACTIVE | DISPENSED | CANCELLED
+  issuedAt       DateTime  @default(now())
+  expiresAt      DateTime
+  dispensedAt    DateTime?
+  dispensedById  String?
+  dispensedByName String?
+}
+
+// ─── Télé-expertise ──────────────────────────────────────────────────
+
+model TeleExpertise {
+  id            String    @id @default(uuid())
+  patientId     String
+  patient       Patient   @relation(fields: [patientId], references: [id])
+  requesterId   String
+  requesterName String
+  requesterSite String?
+  specialty     String
+  question      String
+  attachments   Json      @default("[]")
+  urgency       String    @default("NORMALE")
+  status        String    @default("EN_ATTENTE") // EN_ATTENTE | REPONDUE
+  answer        String?
+  answeredById  String?
+  answeredByName String?
+  answeredAt    DateTime?
+  createdAt     DateTime  @default(now())
+}
+
+// ─── Mère et enfant ──────────────────────────────────────────────────
+
+/// FHIR EpisodeOfCare
+model Pregnancy {
+  id          String    @id @default(uuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  lmp         DateTime  // date des dernières règles
+  edd         DateTime  // date prévue d'accouchement
+  maternity   String?
+  status      String    @default("EN_COURS")
+  visits      AncVisit[]
+  dangerSigns Json      @default("[]")
+  createdAt   DateTime  @default(now())
+}
+
+model AncVisit {
+  id          String    @id @default(uuid())
+  pregnancyId String
+  pregnancy   Pregnancy @relation(fields: [pregnancyId], references: [id], onDelete: Cascade)
+  code        String    // CPN1..CPN4
+  dueFrom     DateTime
+  dueTo       DateTime
+  doneAt      DateTime?
+  place       String?
+}
+
+/// FHIR Immunization
+model Immunization {
+  id          String    @id @default(uuid())
+  patientId   String
+  patient     Patient   @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  vaccineCode String
+  vaccineName String
+  dose        Int
+  dueAt       DateTime
+  givenAt     DateTime?
+  lot         String?
+  place       String?
+}
+
+// ─── Santé publique ──────────────────────────────────────────────────
+
+/// FHIR Communication (alerte officielle)
+model HealthAlert {
+  id         String   @id @default(uuid())
+  kind       String   // EPIDEMIE | VACCINATION | RUPTURE | CANICULE | INONDATION
+  severity   String   // INFO | ATTENTION | URGENCE
+  title      String
+  message    String
+  audioKey   String?
+  source     String   @default("Ministère de la Santé")
+  auto       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime?
+  communes   HealthAlertCommune[]
+}
+
+model HealthAlertCommune {
+  alertId   String
+  alert     HealthAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  communeId String
+  commune   Commune     @relation(fields: [communeId], references: [id])
+
+  @@id([alertId, communeId])
+}
+
+/// Signalement communautaire (SORMAS-like)
+model CommunityReport {
+  id         String   @id @default(uuid())
+  relayId    String?
+  relayName  String?
+  communeId  String
+  commune    Commune  @relation(fields: [communeId], references: [id])
+  village    String?
+  syndrome   String   // DIARRHEE | FIEVRE_ERUPTION | TOUX | PARALYSIE | FIEVRE_HEMORRAGIQUE | DECES_INEXPLIQUE
+  cases      Int      @default(1)
+  createdAt  DateTime @default(now())
+  offline    Boolean  @default(false)
+
+  @@index([communeId, syndrome, createdAt])
+}
+
+// ─── Canaux : outbox SMS / voix / push ───────────────────────────────
+
+model Outbox {
+  id         String    @id @default(uuid())
+  channel    String    // SMS | VOICE | PUSH
+  to         String
+  lang       Lang      @default(fr)
+  body       String    // jamais de donnée médicale : un code, un lien, une consigne
+  audioKey   String?
+  status     String    @default("QUEUED") // QUEUED | SENT | DELIVERED | FAILED
+  ref        String?   // ex. "donor-alert:<id>"
+  createdAt  DateTime  @default(now())
+  sentAt     DateTime?
+
+  @@index([status, createdAt])
+  @@index([to])
+}
+
+/// Messages entrants du simulateur (SMS / USSD)
+model Inbound {
+  id        String   @id @default(uuid())
+  channel   String
+  from      String
+  body      String
+  handled   String?
+  createdAt DateTime @default(now())
+}
