@@ -1,12 +1,15 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
 export async function createApp(): Promise<INestApplication> {
-  const app = await NestFactory.create(AppModule, { logger: ['error', 'warn', 'log'] });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ['error', 'warn', 'log'] });
+  // Photo de résultat compressée côté téléphone (≤ 300 Ko) envoyée en base64 : ~400 Ko de JSON.
+  app.useBodyParser('json', { limit: '512kb' });
   const http = app.getHttpAdapter().getInstance();
   http.set('trust proxy', 1);
   http.disable('x-powered-by');
