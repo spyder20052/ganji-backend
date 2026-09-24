@@ -73,6 +73,6 @@ export class ChannelsController {
   @HttpCode(200)
   demoTick(@Body('horizonHours') horizonHours?: number) {
     demoOnly();
-    return this.svc.tick({ horizonHours: Math.min(Number(horizonHours) || 24, 24 * 30) });
+    return this.svc.demoTick(Math.min(Number(horizonHours) || 24, 24 * 30));
   }
 }

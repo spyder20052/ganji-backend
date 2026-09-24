@@ -140,6 +140,28 @@ export class ChannelsService {
   }
 
   /**
+   * Bouton de démo : les rappels des personas sont datés au moment du seed. Ceux qui sont passés
+   * ou déjà envoyés dans les prochaines 24 h sont reprogrammés à leur prochaine occurrence (même
+   * heure), puis envoyés : la démonstration marche le jour du déploiement comme une semaine après.
+   */
+  async demoTick(horizonHours: number) {
+    const now = Date.now();
+    const stale = await this.prisma.reminder.findMany({
+      where: {
+        dueAt: { lte: new Date(now + 24 * 3600_000) },
+        patient: { user: { is: { demoPersona: { not: null } } } },
+        OR: [{ sentAt: { not: null } }, { dueAt: { lt: new Date(now) } }],
+      },
+    });
+    for (const r of stale) {
+      const next = new Date(r.dueAt);
+      while (next.getTime() < now + 3600_000) next.setUTCDate(next.getUTCDate() + 1);
+      await this.prisma.reminder.update({ where: { id: r.id }, data: { dueAt: next, sentAt: null, confirmedAt: null } });
+    }
+    return this.tick({ horizonHours: Math.max(horizonHours, 26) });
+  }
+
+  /**
    * Tâche planifiée : envoie les rappels des prochaines 24 h (SMS + voix),
    * expire les appels au don anciens, fait vivre les stocks et détecte les regroupements de cas.
    */
@@ -155,7 +177,7 @@ export class ChannelsService {
       const recipients = [r.patient.user, ...r.patient.delegations.filter((d) => d.scopes.includes('reminders') || d.scopes.includes('all')).map((d) => d.caregiver)].filter(
         (u): u is NonNullable<typeof u> => Boolean(u?.phone),
       );
-      const text = this.reminderText(r.kind, r.dueAt, r.place, r.patient.discreetMode ? '' : r.patient.firstName);
+      const text = this.reminderText(r.kind, r.dueAt, r.place, r.patient.firstName, r.patient.discreetMode);
       for (const u of recipients) {
         if (r.channels.includes('SMS')) await this.outbox.send({ channel: 'SMS', to: u.phone!, lang: u.lang, body: text, ref: `reminder:${r.id}`, audioKey: `reminder.${r.kind.toLowerCase()}` });
         if (r.channels.includes('VOICE')) await this.outbox.send({ channel: 'VOICE', to: u.phone!, lang: u.lang, body: `Message vocal (${u.lang}) : ${text}`, ref: `reminder:${r.id}`, audioKey: `reminder.${r.kind.toLowerCase()}` });
@@ -172,8 +194,14 @@ export class ChannelsService {
     return { remindersSent: sent, donorAlertsExpired: expired.count, clusterAlerts: clusters.created };
   }
 
-  private reminderText(kind: string, dueAt: Date, place: string | null, firstName: string) {
+  private reminderText(kind: string, dueAt: Date, place: string | null, firstName: string, discreet: boolean) {
     const when = fmt(dueAt);
+    // Mode discret (téléphone partagé) : ni prénom, ni nature du soin, ni lieu.
+    if (discreet) {
+      return kind === 'MEDICATION'
+        ? "Alafia : c'est l'heure de votre rappel. Répondez 1 quand c'est fait."
+        : `Alafia : vous avez un rendez-vous ${when}. Répondez 1 pour confirmer.`;
+    }
     switch (kind) {
       case 'CPN':
         return `Alafia : ${firstName}, votre consultation prénatale est prévue ${when}${place ? ` à ${place}` : ''}. Répondez 1 pour confirmer.`;

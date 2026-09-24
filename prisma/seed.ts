@@ -36,6 +36,12 @@ const daysAgo = (d: number, h = 9) => {
   return x;
 };
 const inDays = (d: number, h = 9) => daysAgo(-d, h);
+/** Rendez-vous à heure ronde (heure de Cotonou) : « 9 h », pas « 9 h 01 ». */
+const at = (d: number, h: number, m = 0) => {
+  const x = new Date(Date.now() + d * DAY);
+  x.setUTCHours(h - 1, m, 0, 0);
+  return x;
+};
 
 /** Fréquences ABO/Rh plausibles en Afrique de l'Ouest (approximation pour la démo). */
 const BLOOD_FREQ: [string, number][] = [
@@ -284,9 +290,9 @@ async function main() {
   });
   await prisma.reminder.createMany({
     data: [
-      { patientId: koffi.id, kind: 'MEDICATION', title: 'Prise du traitement du soir', dueAt: inDays(0.4, 20), channels: ['APP', 'SMS'] },
-      { patientId: koffi.id, kind: 'LAB', title: 'Prise de sang (NFS)', place: 'Laboratoire CNHU-HKM', dueAt: inDays(3, 8), channels: ['APP', 'SMS'] },
-      { patientId: koffi.id, kind: 'APPOINTMENT', title: 'Consultation hématologie', place: 'CNHU-HKM, Cotonou', dueAt: inDays(6, 10), channels: ['APP', 'SMS', 'VOICE'] },
+      { patientId: koffi.id, kind: 'MEDICATION', title: 'Prise du traitement du soir', dueAt: at(0.4, 20), channels: ['APP', 'SMS'] },
+      { patientId: koffi.id, kind: 'LAB', title: 'Prise de sang (NFS)', place: 'Laboratoire CNHU-HKM', dueAt: at(3, 8), channels: ['APP', 'SMS'] },
+      { patientId: koffi.id, kind: 'APPOINTMENT', title: 'Consultation hématologie', place: 'CNHU-HKM, Cotonou', dueAt: at(6, 10), channels: ['APP', 'SMS', 'VOICE'] },
     ],
   });
   await prisma.symptomLog.createMany({
@@ -335,8 +341,8 @@ async function main() {
   });
   await prisma.reminder.createMany({
     data: [
-      { patientId: bio.id, kind: 'MEDICATION', title: 'Traitement du matin', dueAt: inDays(0.6, 7), channels: ['SMS', 'VOICE'] },
-      { patientId: bio.id, kind: 'APPOINTMENT', title: 'Consultation diabète', place: 'CHD Atacora, Natitingou', dueAt: inDays(9, 9), channels: ['SMS', 'VOICE'] },
+      { patientId: bio.id, kind: 'MEDICATION', title: 'Traitement du matin', dueAt: at(0.6, 7), channels: ['SMS', 'VOICE'] },
+      { patientId: bio.id, kind: 'APPOINTMENT', title: 'Consultation diabète', place: 'CHD Atacora, Natitingou', dueAt: at(9, 9), channels: ['SMS', 'VOICE'] },
     ],
   });
 
@@ -347,25 +353,27 @@ async function main() {
       emergencyName: 'Arouna Yessoufou (mari)', emergencyPhone: '0190000061', communeId: communeId('Kandi'),
     },
   });
-  const lmp = daysAgo(26 * 7);
+  // 31 SA + 6 j : la 3e CPN du protocole national (32 SA) tombe demain, comme son rappel.
+  const lmp = daysAgo(32 * 7 - 1);
   const pregnancy = await prisma.pregnancy.create({
     data: { patientId: rafi.id, lmp, edd: new Date(lmp.getTime() + 280 * DAY), maternity: 'HZ Kandi' },
   });
   for (const v of ANC_SCHEDULE) {
     const dueFrom = new Date(lmp.getTime() + v.weekFrom * 7 * DAY);
     const dueTo = new Date(lmp.getTime() + v.weekTo * 7 * DAY);
-    const done = v.code === 'CPN1' ? daysAgo(15 * 7) : v.code === 'CPN2' ? daysAgo(2 * 7) : null;
+    const done = v.code === 'CPN1' ? daysAgo(20 * 7) : v.code === 'CPN2' ? daysAgo(6 * 7) : null;
     await prisma.ancVisit.create({ data: { pregnancyId: pregnancy.id, code: v.code, dueFrom, dueTo, doneAt: done, place: done ? 'HZ Kandi' : null } });
   }
   await prisma.reminder.create({
-    data: { patientId: rafi.id, kind: 'CPN', title: '3e consultation prénatale', place: 'Hôpital de zone de Kandi', dueAt: inDays(0.8, 9), channels: ['SMS', 'VOICE'] },
+    data: { patientId: rafi.id, kind: 'CPN', title: '3e consultation prénatale', place: 'Hôpital de zone de Kandi', dueAt: at(1, 9), channels: ['SMS', 'VOICE'] },
   });
 
   // ─── 7. Serge : père de jumeaux à Porto-Novo, carnet de vaccination ───
   const serge = await prisma.patient.create({
     data: { userId: users.serge.id, firstName: 'Serge', lastName: 'Dossou', birthDate: new Date('1988-09-09'), sex: 'M', bloodGroup: 'O+', allergies: [], communeId: communeId('Porto-Novo'), emergencyName: 'Chimène Dossou (épouse)', emergencyPhone: '0190000071' },
   });
-  const twinsBirth = daysAgo(72);
+  // 10 semaines moins un jour : les vaccins de 10 semaines sont dus demain, comme le rappel.
+  const twinsBirth = daysAgo(10 * 7 - 1);
   for (const name of ['Kenny', 'Kelly']) {
     const child = await prisma.patient.create({
       data: { firstName: name, lastName: 'Dossou', birthDate: twinsBirth, sex: name === 'Kenny' ? 'M' : 'F', bloodGroup: null, allergies: [], communeId: communeId('Porto-Novo'), parentId: serge.id },
@@ -382,7 +390,7 @@ async function main() {
     });
   }
   await prisma.reminder.create({
-    data: { patientId: serge.id, kind: 'VACCINE', title: 'Vaccins de 10 semaines des jumeaux', place: 'CHUD Ouémé-Plateau', dueAt: inDays(0.7, 8), channels: ['APP', 'SMS', 'VOICE'] },
+    data: { patientId: serge.id, kind: 'VACCINE', title: 'Vaccins de 10 semaines des jumeaux', place: 'CHUD Ouémé-Plateau', dueAt: at(1, 8, 30), channels: ['APP', 'SMS', 'VOICE'] },
   });
 
   // ─── 8. Relais et Mathieu (Djougou) : lien patient pour rattacher le relais à sa commune ───
