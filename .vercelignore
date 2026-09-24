@@ -1,0 +1,7 @@
+# Jamais de secret local ni d artefact dans un déploiement Vercel.
+node_modules
+coverage
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
