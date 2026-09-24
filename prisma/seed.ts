@@ -51,6 +51,11 @@ function bloodGroup() {
 
 const FIRST_F = ['Afiavi', 'Rafiatou', 'Rachidatou', 'Marcelline', 'Chimène', 'Nafissatou', 'Sèna', 'Houéfa', 'Aïcha', 'Bernadette', 'Fifamè', 'Mariam', 'Gisèle', 'Adjoa', 'Sika', 'Rosine', 'Mahougnon', 'Zénabou', 'Clémence', 'Yétondé', 'Akouavi', 'Fatouma', 'Nadège', 'Olga'];
 const FIRST_M = ['Koffi', 'Serge', 'Mathieu', 'Junior', 'Rodrigue', 'Sèdjro', 'Kossi', 'Adébayo', 'Idrissou', 'Moussa', 'Gildas', 'Romaric', 'Honoré', 'Bio', 'Sourou', 'Codjo', 'Mahugnon', 'Arouna', 'Ulrich', 'Fiacre', 'Bachirou', 'Ignace', 'Landry', 'Yacoubou'];
+// Prénoms réservés aux personas : aucun donneur ni patient secondaire ne les porte, sinon
+// « Koffi » apparaîtrait parmi les donneurs alertés pour sa propre demande.
+const PERSONA_NAMES = new Set(['Koffi', 'Afiavi', 'Bio', 'Rafiatou', 'Rachidatou', 'Serge', 'Mathieu', 'Rodrigue', 'Marcelline', 'Junior', 'Aïcha']);
+const CROWD_F = FIRST_F.filter((n) => !PERSONA_NAMES.has(n));
+const CROWD_M = FIRST_M.filter((n) => !PERSONA_NAMES.has(n));
 const LAST = ['Houngbédji', 'Agossou', 'Dossou', 'Adjovi', 'Hounkpatin', 'Kiki', 'Gbaguidi', 'Zinsou', 'Ahouansou', 'Sagbo', 'Tossou', 'Akpovi', 'Chabi', 'Bio Sika', 'Orou', 'Yessoufou', 'Salifou', 'Adékambi', 'Ogoubiyi', 'Soglo', 'Dansou', 'Assogba', 'Lawani', 'Boni', 'Gounou', 'Worou', 'Toko', 'Idohou', 'Kpadonou', 'Amoussou'];
 
 function npi() {
@@ -160,8 +165,12 @@ async function main() {
       for (const [g, f] of BLOOD_FREQ) {
         const base = product === 'CGR' ? 120 : product === 'PLAQUETTES' ? 14 : 40;
         let units = Math.round(base * f * between(0.3, 1.4) * (s.shortName === 'ANTS' ? 2 : 1));
-        // Parcours héros : plaquettes O+ / O- en tension dans le Sud.
-        if (product === 'PLAQUETTES' && ['O+', 'O-'].includes(g) && ['ANTS', 'SDTS Atlantique-Littoral', 'SDTS Ouémé-Plateau'].includes(s.shortName ?? '')) units = g === 'O+' ? 1 : 0;
+        // Parcours héros : plaquettes O+ / O- en tension dans le Sud. Une seule poche compatible
+        // à moins de 60 km du CNHU-HKM, alors que la demande par défaut en réclame 2 : les donneurs
+        // sont alertés.
+        if (product === 'PLAQUETTES' && ['O+', 'O-'].includes(g) && ['ANTS', 'SDTS Atlantique-Littoral', 'SDTS Ouémé-Plateau'].includes(s.shortName ?? '')) {
+          units = g === 'O+' && s.shortName === 'SDTS Atlantique-Littoral' ? 1 : 0;
+        }
         bloodStock.push({ siteId: s.id, product, bloodGroup: g, units });
       }
     }
@@ -393,7 +402,7 @@ async function main() {
     const female = rand() < 0.52;
     const p = await prisma.patient.create({
       data: {
-        firstName: pick(female ? FIRST_F : FIRST_M),
+        firstName: pick(female ? CROWD_F : CROWD_M),
         lastName: pick(LAST),
         birthDate: daysAgo(int(1, 80) * 365 + int(0, 364)),
         sex: female ? 'F' : 'M',
@@ -425,7 +434,7 @@ async function main() {
       const smart = rand() < 0.6;
       const recent = rand() < 0.3;
       donors.push({
-        firstName: pick(female ? FIRST_F : FIRST_M),
+        firstName: pick(female ? CROWD_F : CROWD_M),
         phone: `0196${String(++dn).padStart(6, '0')}`,
         bloodGroup: bloodGroup(),
         sex: female ? 'F' : 'M',
