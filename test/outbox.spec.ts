@@ -6,7 +6,7 @@ describe('OutboxService : aucune donnée médicale par SMS', () => {
   const outbox = new OutboxService(prisma as never);
 
   it('envoie un rappel neutre', async () => {
-    const r = await outbox.send({ channel: 'SMS', to: '0190000001', body: 'Alafia : rendez-vous demain à 10 h au CNHU-HKM.' });
+    const r = await outbox.send({ channel: 'SMS', to: '0190000001', body: 'Ganji : rendez-vous demain à 10 h au CNHU-HKM.' });
     expect(r.status).toBe('SENT');
   });
 

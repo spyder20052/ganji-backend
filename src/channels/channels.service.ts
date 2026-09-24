@@ -68,9 +68,9 @@ export class ChannelsService {
         if (reminder && /^(1|OUI|YES)$/.test(text)) {
           await this.prisma.reminder.update({ where: { id: reminder.id }, data: { confirmedAt: new Date() } });
           handled = 'RAPPEL_CONFIRME';
-          reply = 'Alafia : merci, votre confirmation est bien enregistrée.';
+          reply = 'Ganji : merci, votre confirmation est bien enregistrée.';
         } else {
-          reply = "Alafia : aucune demande en attente pour ce numéro. Tapez RDV pour votre prochain rendez-vous.";
+          reply = "Ganji : aucune demande en attente pour ce numéro. Tapez RDV pour votre prochain rendez-vous.";
         }
       }
     } else if (text === 'RDV') {
@@ -79,13 +79,13 @@ export class ChannelsService {
     } else if (text === 'STOP') {
       handled = 'STOP';
       await this.prisma.donor.updateMany({ where: { phone: from }, data: { available: false } });
-      reply = 'Alafia : vous ne recevrez plus d’appels au don. Envoyez DON pour vous réinscrire.';
+      reply = 'Ganji : vous ne recevrez plus d’appels au don. Envoyez DON pour vous réinscrire.';
     } else if (text === 'DON') {
       handled = 'DON';
       await this.prisma.donor.updateMany({ where: { phone: from }, data: { available: true } });
-      reply = 'Alafia : merci ! Vous êtes de nouveau disponible pour les appels au don.';
+      reply = 'Ganji : merci ! Vous êtes de nouveau disponible pour les appels au don.';
     } else {
-      reply = 'Alafia : commandes possibles : 1 (oui), 2 (non), RDV, DON, STOP. Pour une urgence, appelez le 118.';
+      reply = 'Ganji : commandes possibles : 1 (oui), 2 (non), RDV, DON, STOP. Pour une urgence, appelez le 118.';
     }
     await this.prisma.inbound.create({ data: { channel: 'SMS', from, body, handled } });
     if (reply) await this.outbox.send({ channel: 'SMS', to: from, body: reply, ref: 'sms-reply' });
@@ -96,7 +96,7 @@ export class ChannelsService {
   async ussd(rawFrom: string, input: string) {
     const from = normalizePhone(rawFrom);
     const steps = input.split('*').filter(Boolean);
-    const menu = 'CON Alafia\n1. Mon prochain RDV\n2. Répondre à un appel au don\n3. Pharmacie de garde\n4. Urgence';
+    const menu = 'CON Ganji\n1. Mon prochain RDV\n2. Répondre à un appel au don\n3. Pharmacie de garde\n4. Urgence';
     if (steps.length === 0) return { text: menu };
     switch (steps[0]) {
       case '1':
@@ -114,7 +114,7 @@ export class ChannelsService {
         return { text: `END Pharmacies de garde :\n${pharmacies.map((p) => `- ${p.name} (${p.commune.name})`).join('\n')}` };
       }
       case '4':
-        return { text: 'END Urgence : appelez le 118 (pompiers). Allez à l’hôpital le plus proche. Montrez votre carte QR Alafia.' };
+        return { text: 'END Urgence : appelez le 118 (pompiers). Allez à l’hôpital le plus proche. Montrez votre carte QR Ganji.' };
       default:
         return { text: menu };
     }
@@ -131,12 +131,12 @@ export class ChannelsService {
 
   private async nextAppointmentText(phone: string) {
     const user = await this.prisma.user.findUnique({ where: { phone }, include: { patient: true } });
-    if (!user?.patient) return 'Alafia : aucun carnet lié à ce numéro.';
+    if (!user?.patient) return 'Ganji : aucun carnet lié à ce numéro.';
     const next = await this.prisma.reminder.findFirst({
       where: { patientId: user.patient.id, dueAt: { gte: new Date() }, kind: { in: ['APPOINTMENT', 'CPN', 'VACCINE', 'LAB'] } },
       orderBy: { dueAt: 'asc' },
     });
-    return next ? `Alafia : prochain rendez-vous ${fmt(next.dueAt)}${next.place ? ` à ${next.place}` : ''}.` : 'Alafia : aucun rendez-vous prévu.';
+    return next ? `Ganji : prochain rendez-vous ${fmt(next.dueAt)}${next.place ? ` à ${next.place}` : ''}.` : 'Ganji : aucun rendez-vous prévu.';
   }
 
   /**
@@ -199,20 +199,20 @@ export class ChannelsService {
     // Mode discret (téléphone partagé) : ni prénom, ni nature du soin, ni lieu.
     if (discreet) {
       return kind === 'MEDICATION'
-        ? "Alafia : c'est l'heure de votre rappel. Répondez 1 quand c'est fait."
-        : `Alafia : vous avez un rendez-vous ${when}. Répondez 1 pour confirmer.`;
+        ? "Ganji : c'est l'heure de votre rappel. Répondez 1 quand c'est fait."
+        : `Ganji : vous avez un rendez-vous ${when}. Répondez 1 pour confirmer.`;
     }
     switch (kind) {
       case 'CPN':
-        return `Alafia : ${firstName}, votre consultation prénatale est prévue ${when}${place ? ` à ${place}` : ''}. Répondez 1 pour confirmer.`;
+        return `Ganji : ${firstName}, votre consultation prénatale est prévue ${when}${place ? ` à ${place}` : ''}. Répondez 1 pour confirmer.`;
       case 'VACCINE':
-        return `Alafia : vaccin prévu ${when}${place ? ` à ${place}` : ''} pour votre enfant. Apportez le carnet. Répondez 1 pour confirmer.`;
+        return `Ganji : vaccin prévu ${when}${place ? ` à ${place}` : ''} pour votre enfant. Apportez le carnet. Répondez 1 pour confirmer.`;
       case 'MEDICATION':
-        return `Alafia : ${firstName}, c'est l'heure de votre traitement. Répondez 1 quand c'est fait.`;
+        return `Ganji : ${firstName}, c'est l'heure de votre traitement. Répondez 1 quand c'est fait.`;
       case 'LAB':
-        return `Alafia : ${firstName}, analyse prévue ${when}${place ? ` à ${place}` : ''}. Répondez 1 pour confirmer.`;
+        return `Ganji : ${firstName}, analyse prévue ${when}${place ? ` à ${place}` : ''}. Répondez 1 pour confirmer.`;
       default:
-        return `Alafia : ${firstName}, rendez-vous ${when}${place ? ` à ${place}` : ''}. Répondez 1 pour confirmer.`;
+        return `Ganji : ${firstName}, rendez-vous ${when}${place ? ` à ${place}` : ''}. Répondez 1 pour confirmer.`;
     }
   }
 

@@ -44,7 +44,7 @@ export class ChannelsController {
   @Throttle({ default: { limit: 30, ttl: 60_000 } })
   @Post('sms/inbound')
   @HttpCode(200)
-  inbound(@Body() dto: InboundDto, @Headers('x-alafia-signature') signature?: string) {
+  inbound(@Body() dto: InboundDto, @Headers('x-ganji-signature') signature?: string) {
     // En production : l'agrégateur signe le webhook (HMAC du corps). En démo : simulateur intégré.
     if (process.env.DEMO_MODE !== 'true' && (!signature || !this.crypto.verify(`${dto.from}:${dto.body}`, signature))) {
       throw new ForbiddenException('Signature du webhook invalide');

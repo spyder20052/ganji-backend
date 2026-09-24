@@ -4,7 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import type { Role } from '@prisma/client';
 import { AuthUser, IS_PUBLIC, ROLES } from './auth-user';
 
-export const SESSION_COOKIE = 'alafia_session';
+export const SESSION_COOKIE = 'ganji_session';
 
 /** Garde globale : session obligatoire sauf routes @Public(), puis contrôle de rôle @Roles(). */
 @Injectable()

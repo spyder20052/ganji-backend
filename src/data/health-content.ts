@@ -3,7 +3,7 @@
  *
  * Textes de référence en français et en anglais ; les versions en langues
  * nationales sont enregistrées par un locuteur natif (voir
- * alafia-frontend/docs/ENREGISTREMENTS.md). `langsTarget` indique les langues
+ * ganji-frontend/docs/ENREGISTREMENTS.md). `langsTarget` indique les langues
  * visées pour chaque message (fon et bariba en priorité) : ce n'est pas la
  * liste des fichiers déjà livrés.
  *
@@ -23,8 +23,8 @@ export interface AudioMessageData {
 export const AUDIO_MESSAGES: AudioMessageData[] = [
   {
     key: 'welcome',
-    fr: 'Bienvenue sur Alafia. Votre santé, près de chez vous.',
-    en: 'Welcome to Alafia. Your health, close to home.',
+    fr: 'Bienvenue sur Ganji. Votre santé, près de chez vous.',
+    en: 'Welcome to Ganji. Your health, close to home.',
     langsTarget: ['fon', 'bariba', 'yoruba', 'dendi'],
   },
   {

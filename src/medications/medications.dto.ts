@@ -57,7 +57,7 @@ export class CreatePrescriptionDto {
 }
 
 export class PrescriptionPayloadDto {
-  @ApiProperty({ example: 'alafia:rx:3f0c…-…-….Zk3…', description: 'Contenu du QR code de l’ordonnance' })
+  @ApiProperty({ example: 'ganji:rx:3f0c…-…-….Zk3…', description: 'Contenu du QR code de l’ordonnance' })
   @IsString()
   @Length(10, 200)
   payload: string;

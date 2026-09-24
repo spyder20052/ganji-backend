@@ -12,7 +12,7 @@ import { ImmunizationGivenDto } from './maternal.dto';
 const DAY_MS = 86_400_000;
 /** Un vaccin non fait est « en retard » 14 jours après la date prévue. */
 const OVERDUE_GRACE_MS = 14 * DAY_MS;
-const VAX_PAYLOAD = /^(?:alafia:vax:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{16,64})$/i;
+const VAX_PAYLOAD = /^(?:ganji:vax:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{16,64})$/i;
 
 const VACCINE_BY_CODE = new Map(VACCINE_SCHEDULE.map((v) => [v.code, v]));
 const ANC_BY_CODE = new Map(ANC_SCHEDULE.map((v) => [v.code as string, v]));
@@ -160,7 +160,7 @@ export class MaternalService {
       const recipients = [...(await this.responders.relays(patient.communeId)), ...(await this.responders.caregivers(patient.id))];
       notified = await this.responders.notify(
         recipients,
-        `Alafia : ${patient.firstName} signale un signe de danger de grossesse. Merci de l'appeler et de l'accompagner à la maternité.`,
+        `Ganji : ${patient.firstName} signale un signe de danger de grossesse. Merci de l'appeler et de l'accompagner à la maternité.`,
         `danger-sign:${pregnancy.id}`,
       );
     }
@@ -258,7 +258,7 @@ export class MaternalService {
       immunizations,
       next: immunizations.find((i) => i.status !== 'fait') ?? null,
       proof: {
-        qrPayload: `alafia:vax:${child.id}.${this.crypto.sign(proofString(child.id, given))}`,
+        qrPayload: `ganji:vax:${child.id}.${this.crypto.sign(proofString(child.id, given))}`,
         given,
         issuedAt: now,
       },

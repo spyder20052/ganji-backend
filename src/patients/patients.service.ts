@@ -275,7 +275,7 @@ export class PatientsService {
       shareCode: consent.shareCode,
       scanBefore: consent.expiresAt,
       hours,
-      qrPayload: `alafia:share:${consent.shareToken}:${hours}`,
+      qrPayload: `ganji:share:${consent.shareToken}:${hours}`,
     };
   }
 
@@ -285,7 +285,7 @@ export class PatientsService {
     }
     let raw = token.trim();
     let hours = 24;
-    const m = raw.match(/^alafia:share:([A-Za-z0-9_-]+):(\d+)$/);
+    const m = raw.match(/^ganji:share:([A-Za-z0-9_-]+):(\d+)$/);
     if (m) {
       raw = m[1];
       hours = Math.min(168, Math.max(1, Number(m[2])));
@@ -392,7 +392,7 @@ export class PatientsService {
   async addDelegation(user: AuthUser, dto: DelegationDto) {
     const patientId = this.ownPatientId(user);
     const caregiver = await this.prisma.user.findUnique({ where: { phone: normalizePhone(dto.phone) } });
-    if (!caregiver) throw new NotFoundException("Ce numéro n'a pas encore de compte Alafia. Invitez l'aidant à s'inscrire.");
+    if (!caregiver) throw new NotFoundException("Ce numéro n'a pas encore de compte Ganji. Invitez l'aidant à s'inscrire.");
     const d = await this.prisma.delegation.upsert({
       where: { patientId_caregiverId: { patientId, caregiverId: caregiver.id } },
       update: { relation: dto.relation, scopes: dto.scopes, revokedAt: null },
@@ -404,7 +404,7 @@ export class PatientsService {
         channel: 'SMS',
         to: caregiver.phone,
         lang: caregiver.lang,
-        body: `Alafia : ${user.name} vous a désigné comme aidant. Ouvrez Alafia pour voir ce que vous pouvez faire pour lui.`,
+        body: `Ganji : ${user.name} vous a désigné comme aidant. Ouvrez Ganji pour voir ce que vous pouvez faire pour lui.`,
         ref: `delegation:${d.id}`,
       });
     }

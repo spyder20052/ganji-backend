@@ -33,7 +33,7 @@ const STATUS_LABEL: Record<PrescriptionStatus, string> = {
 /** En dessous de ce seuil, le public voit « stock faible » (jamais le nombre exact). */
 const LOW_STOCK = 5;
 const DEFAULT_VALIDITY_DAYS = 30;
-const RX_PAYLOAD = /^(?:alafia:rx:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{16,64})$/i;
+const RX_PAYLOAD = /^(?:ganji:rx:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{16,64})$/i;
 
 /**
  * Chaîne signée d'une ordonnance. Les lignes sont sérialisées dans un ordre de
@@ -249,7 +249,7 @@ export class MedicationsService {
         channel: 'SMS',
         to: phone,
         lang: patient.user?.lang ?? patient.parent?.user?.lang ?? 'fr',
-        body: `Alafia : votre ordonnance a été délivrée par ${pharmacyName}.`,
+        body: `Ganji : votre ordonnance a été délivrée par ${pharmacyName}.`,
         ref: `prescription:${rx.id}`,
       });
     }
@@ -377,7 +377,7 @@ export class MedicationsService {
       expiresAt: rx.expiresAt,
       dispensedAt: rx.dispensedAt,
       dispensedByName: rx.dispensedByName,
-      qrPayload: withQr && status === 'ACTIVE' ? `alafia:rx:${rx.id}.${rx.signature}` : undefined,
+      qrPayload: withQr && status === 'ACTIVE' ? `ganji:rx:${rx.id}.${rx.signature}` : undefined,
     };
   }
 

@@ -72,7 +72,7 @@ export class CareService {
       const patient = await this.prisma.patient.findUniqueOrThrow({ where: { id: pid } });
       for (const m of team) {
         if (!m.practitioner.user.phone) continue;
-        await this.outbox.send({ channel: 'PUSH', to: m.practitioner.user.phone, body: `Alafia : ${patient.firstName} ${patient.lastName.charAt(0)}. a signalé un signe d'alerte. Ouvrez son carnet.`, ref: `symptom:${log.id}` });
+        await this.outbox.send({ channel: 'PUSH', to: m.practitioner.user.phone, body: `Ganji : ${patient.firstName} ${patient.lastName.charAt(0)}. a signalé un signe d'alerte. Ouvrez son carnet.`, ref: `symptom:${log.id}` });
         notified++;
       }
       await this.audit.log({ actor: user, patientId: pid, action: 'SYMPTOM_ALERT', resource: `Signe d'alerte : ${SYMPTOM_LABEL[dto.symptom]} (${dto.severity}/3)` });
@@ -82,7 +82,7 @@ export class CareService {
       alert,
       notified,
       advice: alert
-        ? ["Votre équipe de soins est prévenue. Si c'est grave ou si ça empire, allez aux urgences sans attendre.", 'Gardez votre carte QR Alafia sur vous.']
+        ? ["Votre équipe de soins est prévenue. Si c'est grave ou si ça empire, allez aux urgences sans attendre.", 'Gardez votre carte QR Ganji sur vous.']
         : ['Symptôme noté dans votre carnet. Votre équipe le verra à la prochaine consultation.'],
     };
   }
@@ -129,7 +129,7 @@ export class CareService {
         },
       });
       if (s.user.phone) {
-        await this.outbox.send({ channel: 'PUSH', to: s.user.phone, body: `Alafia : nouvelle demande d'avis ${dto.urgency === 'URGENTE' ? 'URGENTE ' : ''}de ${facility?.shortName ?? user.name}.`, ref: `tele:${t.id}` });
+        await this.outbox.send({ channel: 'PUSH', to: s.user.phone, body: `Ganji : nouvelle demande d'avis ${dto.urgency === 'URGENTE' ? 'URGENTE ' : ''}de ${facility?.shortName ?? user.name}.`, ref: `tele:${t.id}` });
       }
     }
     await this.audit.log({ actor: user, patientId: dto.patientId, action: 'WRITE', resource: `Demande d'avis en ${specialtyLabel(dto.specialty)}`, ip });
@@ -186,7 +186,7 @@ export class CareService {
     await this.prisma.teleExpertise.update({ where: { id }, data: { status: 'REPONDUE', answer: dto.answer, answeredAt: new Date(), answeredById: user.id, answeredByName: user.name } });
     const requester = await this.prisma.user.findUnique({ where: { id: t.requesterId } });
     if (requester?.phone) {
-      await this.outbox.send({ channel: 'PUSH', to: requester.phone, body: `Alafia : ${user.name} a répondu à votre demande d'avis.`, ref: `tele:${id}` });
+      await this.outbox.send({ channel: 'PUSH', to: requester.phone, body: `Ganji : ${user.name} a répondu à votre demande d'avis.`, ref: `tele:${id}` });
     }
     await this.audit.log({ actor: user, patientId: t.patientId, action: 'WRITE', resource: 'Avis de spécialiste ajouté au carnet', ip });
     return { ok: true };

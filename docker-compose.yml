@@ -1,17 +1,18 @@
 # Démarrage local en une commande : docker compose up
+name: ganji
 services:
   db:
     image: postgres:16-alpine
-    environment: { POSTGRES_USER: alafia, POSTGRES_PASSWORD: alafia, POSTGRES_DB: alafia }
+    environment: { POSTGRES_USER: ganji, POSTGRES_PASSWORD: ganji, POSTGRES_DB: ganji }
     ports: ['5432:5432']
-    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U alafia'], interval: 3s, retries: 20 }
+    healthcheck: { test: ['CMD-SHELL', 'pg_isready -U ganji'], interval: 3s, retries: 20 }
     volumes: [pgdata:/var/lib/postgresql/data]
   api:
     build: .
     depends_on: { db: { condition: service_healthy } }
     environment:
-      DATABASE_URL: postgresql://alafia:alafia@db:5432/alafia
-      DATABASE_URL_UNPOOLED: postgresql://alafia:alafia@db:5432/alafia
+      DATABASE_URL: postgresql://ganji:ganji@db:5432/ganji
+      DATABASE_URL_UNPOOLED: postgresql://ganji:ganji@db:5432/ganji
       DEMO_MODE: 'true'
       NODE_ENV: development
       PORT: '4000'

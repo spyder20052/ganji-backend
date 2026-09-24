@@ -25,7 +25,7 @@ function jwtSecret(): string {
   if (process.env.NODE_ENV === 'production') {
     throw new Error('JWT_SECRET manquant : démarrage refusé en production sans secret de session');
   }
-  return 'alafia-dev-only-jwt-secret-ne-pas-utiliser-en-production';
+  return 'ganji-dev-only-jwt-secret-ne-pas-utiliser-en-production';
 }
 
 @Module({

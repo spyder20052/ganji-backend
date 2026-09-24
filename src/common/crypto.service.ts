@@ -26,7 +26,7 @@ export class CryptoService {
       throw new Error(`${name} manquant`);
     }
     // Clé de développement déterministe : uniquement hors production.
-    return createHmac('sha256', 'alafia-dev-only').update(name).digest();
+    return createHmac('sha256', 'ganji-dev-only').update(name).digest();
   }
 
   encrypt(plain: string | null | undefined): string | null {

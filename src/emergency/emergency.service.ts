@@ -71,7 +71,7 @@ export class EmergencyService {
     if (!recentNotice && holder) {
       await this.responders.notify(
         [holder],
-        "Alafia : votre carte d'urgence vient d'être consultée. Si ce n'est pas normal, contactez-nous.",
+        "Ganji : votre carte d'urgence vient d'être consultée. Si ce n'est pas normal, contactez-nous.",
         ref,
       );
     }
@@ -121,7 +121,7 @@ export class EmergencyService {
     const family = [...(holder ? [holder] : []), ...(await this.responders.caregivers(patient.id))];
     await this.responders.notify(
       family,
-      `Alafia : un soignant (${user.name}) a ouvert votre dossier en urgence. Motif enregistré. Vous pouvez le voir dans votre journal d'accès.`,
+      `Ganji : un soignant (${user.name}) a ouvert votre dossier en urgence. Motif enregistré. Vous pouvez le voir dans votre journal d'accès.`,
       `break-glass:${consent.id}`,
     );
 
@@ -145,7 +145,7 @@ export class EmergencyService {
     });
 
     const position: Origin | null = dto.lat !== undefined && dto.lng !== undefined ? { lat: dto.lat, lng: dto.lng } : null;
-    let body = `Alafia SOS : ${patient.firstName} a besoin d'aide.`;
+    let body = `Ganji SOS : ${patient.firstName} a besoin d'aide.`;
     if (position) {
       const lat = position.lat.toFixed(5);
       const lng = position.lng.toFixed(5);

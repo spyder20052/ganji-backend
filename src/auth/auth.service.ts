@@ -42,7 +42,7 @@ export class AuthService {
         channel: 'SMS',
         to: phone,
         lang: user.lang,
-        body: `Alafia : votre code de connexion est ${code}. Il expire dans 5 minutes. Ne le communiquez à personne.`,
+        body: `Ganji : votre code de connexion est ${code}. Il expire dans 5 minutes. Ne le communiquez à personne.`,
         ref: 'otp',
       });
     }
@@ -67,7 +67,7 @@ export class AuthService {
       await this.outbox.send({
         channel: 'SMS',
         to: phone,
-        body: "Alafia : nouvelle connexion à votre compte. Si ce n'est pas vous, appelez le relais de votre commune.",
+        body: "Ganji : nouvelle connexion à votre compte. Si ce n'est pas vous, appelez le relais de votre commune.",
         ref: 'login-alert',
       });
     }

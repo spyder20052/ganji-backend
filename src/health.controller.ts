@@ -11,7 +11,7 @@ export class HealthController {
   @Public()
   @Get()
   root() {
-    return { service: 'API Alafia', docs: '/docs', health: '/health' };
+    return { service: 'API Ganji', docs: '/docs', health: '/health' };
   }
 
   @Public()

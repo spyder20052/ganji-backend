@@ -1,8 +1,8 @@
 {
-  "name": "alafia-backend",
+  "name": "ganji-backend",
   "version": "0.1.0",
   "private": true,
-  "description": "API Alafia : la santé de chaque Béninois, à chaque moment de la vie (NestJS + Prisma + PostgreSQL)",
+  "description": "API Ganji : la santé de chaque Béninois, à chaque moment de la vie (NestJS + Prisma + PostgreSQL)",
   "license": "MIT",
   "engines": {
     "node": ">=20"

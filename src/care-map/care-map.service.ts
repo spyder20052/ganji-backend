@@ -68,7 +68,7 @@ export class CareMapService {
       nodes: TRIAGE_TREE,
       advice: TRIAGE_ADVICE,
       disclaimer:
-        "Orientation seulement : Alafia ne pose pas de diagnostic. En cas de doute, allez au centre de santé. Arbre de démonstration à valider par des médecins référents.",
+        "Orientation seulement : Ganji ne pose pas de diagnostic. En cas de doute, allez au centre de santé. Arbre de démonstration à valider par des médecins référents.",
       // Nom et date du médecin référent qui a validé l'arbre ; aucun pour la démonstration.
       validatedBy: null,
     };

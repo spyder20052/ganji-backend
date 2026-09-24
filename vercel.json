@@ -3,8 +3,21 @@
   "buildCommand": "npm run vercel-build",
   "outputDirectory": "public",
   "functions": {
-    "api/index.js": { "includeFiles": "dist/**", "maxDuration": 30 }
+    "api/index.js": {
+      "includeFiles": "{dist/**,node_modules/swagger-ui-dist/**}",
+      "maxDuration": 30
+    }
   },
-  "rewrites": [{ "source": "/(.*)", "destination": "/api/index.js" }],
-  "crons": [{ "path": "/jobs/tick", "schedule": "0 6 * * *" }]
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/jobs/tick",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }

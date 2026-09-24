@@ -82,7 +82,7 @@ export class AlertsService {
       take: 50,
     });
     for (const r of recipients) {
-      await this.outbox.send({ channel: 'SMS', to: r.phone!, lang: r.lang, body: `Alafia · ${dto.title} : ${dto.message}`.slice(0, 300), ref: `alert:${alert.id}` });
+      await this.outbox.send({ channel: 'SMS', to: r.phone!, lang: r.lang, body: `Ganji · ${dto.title} : ${dto.message}`.slice(0, 300), ref: `alert:${alert.id}` });
     }
     await this.audit.log({ actor: user, action: 'ALERT', resource: `Alerte « ${dto.title} » (${communes.length || 'national'})` });
     return { id: alert.id, broadcast: recipients.length };
@@ -156,7 +156,7 @@ export class AlertsService {
           severity: IMMEDIATE.has(g.syndrome) ? 'URGENCE' : 'ATTENTION',
           title,
           message: `${g._count._all} signalement(s) communautaire(s), ${g._sum.cases ?? 0} cas en ${CLUSTER_WINDOW_DAYS} jours. Investigation recommandée par l'équipe de la zone sanitaire.`,
-          source: 'Détection automatique Alafia',
+          source: 'Détection automatique Ganji',
           auto: true,
           expiresAt: new Date(Date.now() + 14 * 86_400_000),
           communes: { create: [{ communeId: commune.id }] },
@@ -164,7 +164,7 @@ export class AlertsService {
       });
       const officers = await this.prisma.user.findMany({ where: { role: 'MINISTRY', phone: { not: null } }, select: { phone: true } });
       for (const o of officers) {
-        await this.outbox.send({ channel: 'SMS', to: o.phone!, body: `Alafia surveillance : ${title}. Voir le tableau de bord.`, ref: `cluster:${commune.id}:${g.syndrome}` });
+        await this.outbox.send({ channel: 'SMS', to: o.phone!, body: `Ganji surveillance : ${title}. Voir le tableau de bord.`, ref: `cluster:${commune.id}:${g.syndrome}` });
       }
       created.push(title);
     }

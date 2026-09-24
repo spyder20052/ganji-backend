@@ -1,4 +1,4 @@
-// Alafia : modèle de données aligné sur FHIR R4.
+// Ganji : modèle de données aligné sur FHIR R4.
 // Chaque modèle indique la ressource FHIR équivalente.
 // Champs suffixés "Enc" : chiffrés au niveau applicatif (AES-256-GCM).
 
@@ -148,7 +148,7 @@ model Patient {
   communeId        String?
   commune          Commune?  @relation(fields: [communeId], references: [id])
   qrToken          String    @unique @default(uuid())
-  provisionalId    String?   @unique // identifiant provisoire Alafia (sans NPI)
+  provisionalId    String?   @unique // identifiant provisoire Ganji (sans NPI)
   discreetMode     Boolean   @default(false)
   createdAt        DateTime  @default(now())
 

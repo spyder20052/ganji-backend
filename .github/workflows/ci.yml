@@ -14,13 +14,13 @@ jobs:
     services:
       postgres:
         image: postgres:16
-        env: { POSTGRES_USER: alafia, POSTGRES_PASSWORD: alafia, POSTGRES_DB: alafia }
+        env: { POSTGRES_USER: ganji, POSTGRES_PASSWORD: ganji, POSTGRES_DB: ganji }
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U alafia" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U ganji" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DATABASE_URL: postgresql://alafia:alafia@localhost:5432/alafia
-      DATABASE_URL_UNPOOLED: postgresql://alafia:alafia@localhost:5432/alafia
+      DATABASE_URL: postgresql://ganji:ganji@localhost:5432/ganji
+      DATABASE_URL_UNPOOLED: postgresql://ganji:ganji@localhost:5432/ganji
       DEMO_MODE: 'true'
     steps:
       - uses: actions/checkout@v4

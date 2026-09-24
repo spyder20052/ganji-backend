@@ -1,12 +1,12 @@
-# Alafia · API
+# Ganji · API
 
-API de la plateforme **Alafia** (santé de chaque Béninois, challenge e-Santé du MTDI) : NestJS 11, Prisma 6, PostgreSQL 16. Documentation OpenAPI interactive sur **`/docs`** (JSON : `/docs/openapi.json`).
+API de la plateforme **Ganji** (santé de chaque Béninois, challenge e-Santé du MTDI) : NestJS 11, Prisma 6, PostgreSQL 16. Documentation OpenAPI interactive sur **`/docs`** (JSON : `/docs/openapi.json`).
 
 | | |
 |---|---|
 | API déployée | [Lien] |
 | Documentation Swagger | [Lien]/docs |
-| Frontend | dépôt `alafia-frontend` |
+| Frontend | dépôt `ganji-frontend` |
 | Sécurité | [`SECURITY.md`](SECURITY.md) |
 
 > **Données fictives** pour toutes les personnes ; données publiques réelles (12 départements, 77 communes, établissements de santé, médicaments essentiels, calendrier vaccinal PEV) dans `src/data/`.

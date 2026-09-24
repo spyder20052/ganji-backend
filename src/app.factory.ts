@@ -38,16 +38,16 @@ export async function createApp(): Promise<INestApplication> {
   // Pas de CORS : le frontend appelle l'API via un rewrite même origine (/api/*).
 
   const config = new DocumentBuilder()
-    .setTitle('API Alafia')
+    .setTitle('API Ganji')
     .setDescription(
       "La santé de chaque Béninois, à chaque moment de la vie. API unique pour le web, les SMS, l'USSD et la voix. " +
         'Authentification par cookie de session HttpOnly. Données personnelles fictives (démonstration).',
     )
     .setVersion('0.1.0')
-    .addCookieAuth('alafia_session')
+    .addCookieAuth('ganji_session')
     .build();
   SwaggerModule.setup('docs', app, () => SwaggerModule.createDocument(app, config), {
-    customSiteTitle: 'API Alafia',
+    customSiteTitle: 'API Ganji',
     jsonDocumentUrl: 'docs/openapi.json',
   });
   return app;

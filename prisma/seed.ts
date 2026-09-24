@@ -1,5 +1,5 @@
 /**
- * Jeu de données Alafia.
+ * Jeu de données Ganji.
  * Règle : tout ce qui est public est réel (départements, communes, établissements,
  * médicaments essentiels, calendrier vaccinal) ; tout ce qui est personnel est fictif.
  *
@@ -8,6 +8,7 @@
 import { Prisma, PrismaClient, Role, Lang } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { CryptoService } from '../src/common/crypto.service';
+import { loadDotEnv } from '../src/common/env';
 import { COMMUNES, DEPARTMENTS } from '../src/data/geo';
 import { FACILITIES } from '../src/data/facilities';
 import { MEDICATIONS } from '../src/data/medications';
@@ -15,6 +16,7 @@ import { ANC_SCHEDULE, VACCINE_SCHEDULE } from '../src/data/vaccines';
 import { prescriptionSignedString } from '../src/medications/medications.service';
 
 const prisma = new PrismaClient();
+loadDotEnv();
 const crypto = new CryptoService();
 
 // ─── Aléatoire déterministe (mulberry32) : la démo est identique à chaque seed ───

@@ -147,7 +147,7 @@ export class BloodService {
         lang: d.lang,
         audioKey: 'donor.call',
         ref: `donor-alert:${alert.id}`,
-        body: `Alafia : ${d.firstName}, votre don de sang ${req.bloodGroup === d.bloodGroup ? `(${d.bloodGroup})` : `(${d.bloodGroup}, compatible)`} peut sauver une vie à ${place}, à ${Math.round(km)} km. Répondez 1 pour OUI ou 2 pour NON.`,
+        body: `Ganji : ${d.firstName}, votre don de sang ${req.bloodGroup === d.bloodGroup ? `(${d.bloodGroup})` : `(${d.bloodGroup}, compatible)`} peut sauver une vie à ${place}, à ${Math.round(km)} km. Répondez 1 pour OUI ou 2 pour NON.`,
       });
       if (!d.hasSmartphone && d.lang !== 'fr') {
         await this.outbox.send({ channel: 'VOICE', to: d.phone, lang: d.lang, audioKey: 'donor.call', ref: `donor-alert:${alert.id}`, body: `Appel vocal (${d.lang}) : appel au don de sang à ${place}. Tapez 1 pour oui, 2 pour non.` });
@@ -167,7 +167,7 @@ export class BloodService {
 
     if (!accept) {
       await this.prisma.donorAlert.update({ where: { id: alert.id }, data: { status: 'REFUSEE', respondedAt: new Date() } });
-      await this.outbox.send({ channel: 'SMS', to: alert.donor.phone, body: 'Alafia : merci de votre réponse. Nous vous solliciterons une autre fois.', ref: `donor-alert:${alert.id}` });
+      await this.outbox.send({ channel: 'SMS', to: alert.donor.phone, body: 'Ganji : merci de votre réponse. Nous vous solliciterons une autre fois.', ref: `donor-alert:${alert.id}` });
       return { status: 'REFUSEE' };
     }
 
@@ -181,13 +181,13 @@ export class BloodService {
       to: alert.donor.phone,
       audioKey: 'donor.thanks',
       ref: `donor-alert:${alert.id}`,
-      body: `Alafia : merci ${alert.donor.firstName} ! Rendez-vous ${fmtDate(appointment)} à ${place}, service de transfusion. Venez avec une pièce d'identité, après avoir mangé.`,
+      body: `Ganji : merci ${alert.donor.firstName} ! Rendez-vous ${fmtDate(appointment)} à ${place}, service de transfusion. Venez avec une pièce d'identité, après avoir mangé.`,
     });
     // Famille : message vocal dans sa langue (parcours Afiavi) + SMS, sans donnée médicale.
     const family = await this.prisma.delegation.findMany({ where: { patientId: req.patientId, revokedAt: null }, include: { caregiver: true } });
     for (const f of family) {
       if (!f.caregiver.phone) continue;
-      await this.outbox.send({ channel: 'SMS', to: f.caregiver.phone, lang: f.caregiver.lang, audioKey: 'donor.found', ref: `blood-request:${req.id}`, body: `Alafia : bonne nouvelle, un donneur a été trouvé pour ${req.patient.firstName}. Don prévu ${fmtDate(appointment)} à ${place}.` });
+      await this.outbox.send({ channel: 'SMS', to: f.caregiver.phone, lang: f.caregiver.lang, audioKey: 'donor.found', ref: `blood-request:${req.id}`, body: `Ganji : bonne nouvelle, un donneur a été trouvé pour ${req.patient.firstName}. Don prévu ${fmtDate(appointment)} à ${place}.` });
       if (f.caregiver.lang !== 'fr') {
         await this.outbox.send({ channel: 'VOICE', to: f.caregiver.phone, lang: f.caregiver.lang, audioKey: 'donor.found', ref: `blood-request:${req.id}`, body: `Message vocal (${f.caregiver.lang}) : un donneur est trouvé pour ${req.patient.firstName}, rendez-vous ${fmtDate(appointment)}.` });
       }

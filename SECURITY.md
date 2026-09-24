@@ -1,4 +1,4 @@
-# Sécurité d'Alafia
+# Sécurité de Ganji
 
 > Principe central : **aucune donnée de santé n'est lue sans le consentement du patient ou un motif d'urgence tracé.**
 > Référentiel visé : OWASP ASVS niveau 2. Cadre légal : Code du numérique du Bénin (loi n° 2017-20, livre V), APDP.
@@ -36,4 +36,4 @@
 
 ## 3. Signaler une faille
 
-Écrire à **securite@alafia.bj** (adresse de démonstration) avec les étapes de reproduction. Nous accusons réception sous 72 h et publions un correctif coordonné. Merci de ne pas exploiter la faille au-delà de la preuve de concept et de ne jamais accéder à des données d'autrui.
+Écrire à **securite@ganji.bj** (adresse de démonstration) avec les étapes de reproduction. Nous accusons réception sous 72 h et publions un correctif coordonné. Merci de ne pas exploiter la faille au-delà de la preuve de concept et de ne jamais accéder à des données d'autrui.
