@@ -8,8 +8,9 @@ import { AppModule } from './app.module';
 
 export async function createApp(): Promise<INestApplication> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger: ['error', 'warn', 'log'] });
-  // Photo de résultat compressée côté téléphone (≤ 300 Ko) envoyée en base64 : ~400 Ko de JSON.
-  app.useBodyParser('json', { limit: '512kb' });
+  // Photos compressées côté téléphone (≤ 300 Ko chacune) envoyées en base64 : jusqu'à 3 par
+  // demande de télé-expertise, soit ~1,3 Mo de JSON.
+  app.useBodyParser('json', { limit: '1500kb' });
   const http = app.getHttpAdapter().getInstance();
   http.set('trust proxy', 1);
   http.disable('x-powered-by');

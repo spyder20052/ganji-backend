@@ -8,6 +8,7 @@ import { OutboxService } from '../common/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizePhone } from '../auth/auth.dto';
 import { DelegationDto, DocumentDto, EncounterDto, ObservationDto, ShareDto } from './patients.dto';
+import { specialtyLabel } from '../data/specialties';
 
 export const OBS_META: Record<string, { label: string; unit: string; low?: number; high?: number }> = {
   HB: { label: 'Hémoglobine', unit: 'g/dL', low: 12, high: 17 },
@@ -111,7 +112,7 @@ export class PatientsService {
         id: t.id,
         kind: 'TELE_EXPERTISE',
         date: t.answeredAt ?? t.createdAt,
-        title: `Avis de ${t.specialty.toLowerCase()}`,
+        title: `Avis en ${specialtyLabel(t.specialty)}`,
         place: t.requesterSite,
         author: t.answeredByName,
         detail: t.answer,
