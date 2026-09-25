@@ -5,6 +5,12 @@ import { normalizePhone } from '../auth/auth.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AlertsService } from '../alerts/alerts.service';
 
+/**
+ * Fenêtre du bouton de démo : « demain 9 h » peut être à 31 h si l'on appuie à 1 h du matin.
+ * 48 h couvrent toujours le prochain rappel des personas, quelle que soit l'heure de la démo.
+ */
+const DEMO_HORIZON_HOURS = 48;
+
 function fmt(d: Date) {
   return d.toLocaleString('fr-FR', { timeZone: 'Africa/Porto-Novo', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
@@ -141,14 +147,14 @@ export class ChannelsService {
 
   /**
    * Bouton de démo : les rappels des personas sont datés au moment du seed. Ceux qui sont passés
-   * ou déjà envoyés dans les prochaines 24 h sont reprogrammés à leur prochaine occurrence (même
+   * ou déjà envoyés dans les prochaines 48 h sont reprogrammés à leur prochaine occurrence (même
    * heure), puis envoyés : la démonstration marche le jour du déploiement comme une semaine après.
    */
   async demoTick(horizonHours: number) {
     const now = Date.now();
     const stale = await this.prisma.reminder.findMany({
       where: {
-        dueAt: { lte: new Date(now + 24 * 3600_000) },
+        dueAt: { lte: new Date(now + DEMO_HORIZON_HOURS * 3600_000) },
         patient: { user: { is: { demoPersona: { not: null } } } },
         OR: [{ sentAt: { not: null } }, { dueAt: { lt: new Date(now) } }],
       },
@@ -158,7 +164,7 @@ export class ChannelsService {
       while (next.getTime() < now + 3600_000) next.setUTCDate(next.getUTCDate() + 1);
       await this.prisma.reminder.update({ where: { id: r.id }, data: { dueAt: next, sentAt: null, confirmedAt: null } });
     }
-    return this.tick({ horizonHours: Math.max(horizonHours, 26) });
+    return this.tick({ horizonHours: Math.max(horizonHours, DEMO_HORIZON_HOURS) });
   }
 
   /**
