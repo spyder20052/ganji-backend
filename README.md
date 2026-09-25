@@ -4,9 +4,9 @@ API de la plateforme **Ganji** (santé de chaque Béninois, challenge e-Santé d
 
 | | |
 |---|---|
-| API déployée | [Lien] |
-| Documentation Swagger | [Lien]/docs |
-| Frontend | dépôt `ganji-frontend` |
+| API déployée | **https://ganji-api.vercel.app** (`/health`) |
+| Documentation Swagger | https://ganji-api.vercel.app/docs |
+| Frontend | https://ganji-sante.vercel.app · dépôt [`ganji-frontend`](https://github.com/spyder20052/ganji-frontend) |
 | Sécurité | [`SECURITY.md`](SECURITY.md) |
 
 > **Données fictives** pour toutes les personnes ; données publiques réelles (12 départements, 77 communes, établissements de santé, médicaments essentiels, calendrier vaccinal PEV) dans `src/data/`.
@@ -42,6 +42,6 @@ npm run dev
 
 ## Déploiement Vercel
 
-1. Importer le dépôt dans Vercel (framework : Other). Le build lance `npm run vercel-build` (Prisma, schéma, seed si base vide, compilation) et `api/index.js` sert l'application Nest en fonction serverless.
+1. Projet Vercel `ganji-api`, branche de production `develop`. Le build lance `npm run vercel-build` (client Prisma, schéma et trigger d'audit, seed si la base est vide) ; `api/index.ts` importe `src/serverless.ts` et Vercel embarque le code qu'il trace. `.vercelignore` n'envoie jamais de `.env` local.
 2. Ajouter une base **Neon Postgres** depuis le Marketplace Vercel (fournit `DATABASE_URL` et `DATABASE_URL_UNPOOLED`).
 3. Variables : `JWT_SECRET`, `FIELD_ENCRYPTION_KEY`, `HMAC_KEY` (32 octets base64), `CRON_SECRET`, `DEMO_MODE=true`, `PUBLIC_APP_URL`.
