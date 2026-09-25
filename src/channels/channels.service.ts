@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { BloodService } from '../blood/blood.service';
 import { OutboxService } from '../common/outbox.service';
+import { TickRegistry } from '../common/tick.registry';
 import { normalizePhone } from '../auth/auth.dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AlertsService } from '../alerts/alerts.service';
@@ -26,6 +27,7 @@ export class ChannelsService {
     private readonly outbox: OutboxService,
     private readonly blood: BloodService,
     private readonly alerts: AlertsService,
+    private readonly ticks: TickRegistry,
   ) {}
 
   async outboxFor(rawPhone: string) {
@@ -197,7 +199,9 @@ export class ChannelsService {
       data: { status: 'EXPIREE' },
     });
     const clusters = await this.alerts.detectClusters();
-    return { remindersSent: sent, donorAlertsExpired: expired.count, clusterAlerts: clusters.created };
+    // Tâches des autres modules (rendez-vous, relances du cercle de soins, commandes…).
+    const modules = await this.ticks.runAll();
+    return { remindersSent: sent, donorAlertsExpired: expired.count, clusterAlerts: clusters.created, ...modules };
   }
 
   private reminderText(kind: string, dueAt: Date, place: string | null, firstName: string, discreet: boolean) {

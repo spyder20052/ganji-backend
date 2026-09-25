@@ -17,6 +17,14 @@ import { MaternalModule } from './maternal/maternal.module';
 import { MedicationsModule } from './medications/medications.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.service';
+import { NotificationsModule } from './notifications/notifications.module';
+import { ProfileModule } from './profile/profile.module';
+import { AppointmentsModule } from './appointments/appointments.module';
+import { OrdersModule } from './orders/orders.module';
+import { ListenModule } from './listen/listen.module';
+import { RightsModule } from './rights/rights.module';
+import { AssistantModule } from './assistant/assistant.module';
+import { CircleModule } from './circle/circle.module';
 
 /** Secret de signature des sessions : obligatoire en production, valeur de développement sinon. */
 function jwtSecret(): string {
@@ -50,6 +58,14 @@ function jwtSecret(): string {
     MedicationsModule,
     EmergencyModule,
     MaternalModule,
+    NotificationsModule,
+    ProfileModule,
+    AppointmentsModule,
+    OrdersModule,
+    ListenModule,
+    RightsModule,
+    AssistantModule,
+    CircleModule,
   ],
   controllers: [HealthController],
   providers: [

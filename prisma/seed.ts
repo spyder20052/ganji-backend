@@ -15,6 +15,8 @@ import { MEDICATIONS } from '../src/data/medications';
 import { ANC_SCHEDULE, VACCINE_SCHEDULE } from '../src/data/vaccines';
 import { prescriptionSignedString } from '../src/medications/medications.service';
 
+import { seedExtensions } from './seed-ext';
+
 const prisma = new PrismaClient();
 loadDotEnv();
 const crypto = new CryptoService();
@@ -101,6 +103,7 @@ async function reset() {
   // Le journal d'audit est protégé en ajout seul : on désactive le trigger le temps du reset de démo.
   await prisma.$executeRawUnsafe('ALTER TABLE "AuditEvent" DISABLE TRIGGER USER').catch(() => undefined);
   const tables = [
+    'Notification', 'Appointment', 'Order', 'ListenMessage', 'ListenThread', 'Coverage', 'CareTariff', 'Payment', 'DoseLog', 'RelayVisit',
     'Inbound', 'Outbox', 'HealthAlertCommune', 'HealthAlert', 'CommunityReport', 'Immunization', 'AncVisit', 'Pregnancy',
     'TeleExpertise', 'Prescription', 'PharmacyStock', 'DonorAlert', 'Donor', 'BloodRequest', 'BloodStock', 'SymptomLog',
     'Reminder', 'CarePlan', 'DocumentRef', 'Observation', 'Encounter', 'Condition', 'AuditEvent', 'Consent', 'CareTeamMember',
@@ -527,6 +530,9 @@ async function main() {
       { relayName: 'Relais Kpébié', communeId: communeId('Parakou'), village: 'Kpébié', syndrome: 'TOUX', cases: 1, createdAt: daysAgo(3, 9) },
     ],
   });
+
+  // ─── 14. Fonctions ajoutées : profil, rendez-vous, sang, commandes, écoute, droits, assistant, cercle ───
+  await seedExtensions({ prisma, users, communeId, daysAgo, inDays, at });
 
   console.timeEnd('seed');
   console.log(`Seed terminé : ${await prisma.facility.count()} établissements, ${await prisma.patient.count()} patients, ${await prisma.donor.count()} donneurs.`);
