@@ -111,7 +111,8 @@ async function reset() {
 }
 
 async function main() {
-  if (process.argv.includes('--if-empty') && (await prisma.department.count()) > 0) {
+  // DEMO_RESET=true (variable posée le temps d'un déploiement) : remet la démo à l'état initial.
+  if (process.argv.includes('--if-empty') && process.env.DEMO_RESET !== 'true' && (await prisma.department.count()) > 0) {
     console.log('Base déjà initialisée : seed ignoré.');
     return;
   }
