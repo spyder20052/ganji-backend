@@ -1,8 +1,8 @@
 import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Req } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthUser, CurrentUser, Roles } from '../common/auth-user';
-import { CreateBloodRequestDto, RespondDto, StockDto } from './blood.dto';
+import { CreateBloodRequestDto, DonorProfileDto, ReserveDto, RespondDto, ServedDto, StockDto } from './blood.dto';
 import { BloodService } from './blood.service';
 
 @ApiTags('M4 · Sang')
@@ -28,13 +28,14 @@ export class BloodController {
 
   @Roles('PRACTITIONER', 'NURSE')
   @Post('requests')
+  @ApiOperation({ summary: 'Demande de produit sanguin : banque de sang prévenue, stocks vérifiés, donneurs alertés (40 → 80 → 150 km)' })
   create(@CurrentUser() u: AuthUser, @Body() dto: CreateBloodRequestDto, @Req() req: Request) {
     return this.svc.create(u, dto, req.ip);
   }
 
   @Get('requests/:id')
-  get(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.svc.get(u, id);
+  get(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.svc.get(u, id, req.ip);
   }
 
   @Roles('PRACTITIONER', 'NURSE', 'BLOOD_BANK')
@@ -44,11 +45,48 @@ export class BloodController {
     return this.svc.alertDonors(u, id);
   }
 
+  @Roles('BLOOD_BANK')
+  @Post('requests/:id/reserve')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Banque de sang : met de côté des poches compatibles de son stock pour une demande' })
+  reserve(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ReserveDto) {
+    return this.svc.reserve(u, id, dto.units);
+  }
+
   @Roles('PRACTITIONER', 'NURSE', 'BLOOD_BANK')
   @Post('requests/:id/served')
   @HttpCode(200)
-  served(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.svc.markServed(u, id);
+  @ApiOperation({ summary: 'Transfusion faite : seuls les donneurs cochés (qui ont réellement donné) voient leur don inscrit' })
+  served(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ServedDto, @Req() req: Request) {
+    return this.svc.markServed(u, id, dto.donorAlertIds ?? [], req.ip);
+  }
+
+  @Roles('PATIENT', 'CAREGIVER')
+  @Post('requests/:id/volunteer')
+  @HttpCode(200)
+  @ApiOperation({ summary: '« Je peux donner » : un donneur inscrit se propose pour une demande proche' })
+  volunteer(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.svc.volunteer(u, id);
+  }
+
+  @Roles('PATIENT', 'CAREGIVER')
+  @Get('nearby')
+  @ApiOperation({ summary: 'Demandes ouvertes compatibles à moins de 40 km du donneur (anonymes)' })
+  nearby(@CurrentUser() u: AuthUser) {
+    return this.svc.nearby(u);
+  }
+
+  @Roles('PATIENT', 'CAREGIVER')
+  @Get('donor/me')
+  donorMe(@CurrentUser() u: AuthUser) {
+    return this.svc.donorMe(u);
+  }
+
+  @Roles('PATIENT', 'CAREGIVER')
+  @Put('donor/me')
+  @ApiOperation({ summary: 'Devenir donneur ou mettre à jour sa fiche (groupe, commune, disponibilité, téléphone)' })
+  saveDonorMe(@CurrentUser() u: AuthUser, @Body() dto: DonorProfileDto) {
+    return this.svc.saveDonorMe(u, dto);
   }
 
   @Get('donor/alerts')

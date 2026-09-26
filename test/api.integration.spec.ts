@@ -140,13 +140,30 @@ describe.skipIf(!process.env.DATABASE_URL)('API Ganji sur base seedée', () => {
       await publicApi.post('/sms/inbound').send({ from: PHONE.rodrigue, body: '1' }).expect(200);
       const after = await as('houngbedji').get(`/blood/requests/${created.body.id}`).expect(200);
       expect(after.body.status).toBe('DONNEUR_TROUVE');
+      const rodrigueAlert = (after.body.donors as { id: string; firstName: string; status: string }[]).find((d) => d.firstName === 'Rodrigue' && d.status === 'ACCEPTEE');
+      expect(rodrigueAlert).toBeTruthy();
 
-      const family = await publicApi.get(`/sms/outbox?to=${PHONE.afiavi}`).expect(200);
-      expect((family.body as { channel: string; lang: string; audioKey: string }[]).some((m) => m.channel === 'VOICE' && m.lang === 'fon' && m.audioKey === 'donor.found')).toBe(true);
+      // La famille est prévenue dans sa langue, sans rien qui révèle le soin (ni sang, ni donneur, ni hôpital).
+      const family = (await publicApi.get(`/sms/outbox?to=${PHONE.afiavi}`).expect(200)).body as { channel: string; lang: string; body: string; ref: string }[];
+      const news = family.filter((m) => m.ref === `blood-request:${created.body.id}`);
+      expect(news.some((m) => m.channel === 'VOICE' && m.lang === 'fon')).toBe(true);
+      expect(news.length).toBeGreaterThan(0);
+      for (const m of news) expect(m.body).not.toMatch(/sang|donneur|CNHU|transfusion/i);
 
-      await as('houngbedji').post(`/blood/requests/${created.body.id}/served`).expect(200);
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      const platelets = await prisma.bloodStock.findMany({ where: { product: 'PLAQUETTES', bloodGroup: { in: ['O+', 'O-'] } } });
+      await as('houngbedji').post(`/blood/requests/${created.body.id}/served`).send({ donorAlertIds: [rodrigueAlert!.id] }).expect(200);
       const timeline = await as('koffi').get(`/patients/${koffi()}/timeline`).expect(200);
       expect(JSON.stringify(timeline.body)).toContain('Transfusion de 2 poches de plaquettes');
+
+      // La transfusion inscrit le don de Rodrigue et puise le reste dans le stock : Rodrigue et le stock
+      // sont remis dans leur état de démonstration pour le parcours suivant.
+      for (const s of platelets) await prisma.bloodStock.update({ where: { id: s.id }, data: { units: s.units } });
+      const rodrigue = await prisma.donor.findUniqueOrThrow({ where: { phone: PHONE.rodrigue } });
+      expect(Date.now() - (rodrigue.lastDonationAt?.getTime() ?? 0)).toBeLessThan(120_000);
+      await prisma.donor.update({ where: { phone: PHONE.rodrigue }, data: { lastDonationAt: new Date(Date.now() - 140 * 86_400_000), donations: { decrement: 1 } } });
+      await prisma.$disconnect();
     });
 
     it('un patient ne peut pas créer de demande de sang', async () => {

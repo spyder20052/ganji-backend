@@ -9,6 +9,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { normalizePhone } from '../auth/auth.dto';
 import { DelegationDto, DocumentDto, EncounterDto, ObservationDto, ShareDto } from './patients.dto';
 import { specialtyLabel } from '../data/specialties';
+import { LISTEN_AUDIT_PREFIX } from '../listen/listen.constants';
 
 export const OBS_META: Record<string, { label: string; unit: string; low?: number; high?: number }> = {
   HB: { label: 'Hémoglobine', unit: 'g/dL', low: 12, high: 17 },
@@ -67,6 +68,7 @@ export class PatientsService {
       birthDate: p.birthDate,
       sex: p.sex,
       bloodGroup: p.bloodGroup,
+      bloodGroupSource: p.bloodGroupSource,
       allergies: p.allergies,
       treatments: this.crypto.decrypt(p.treatmentsEnc),
       conditions: p.conditions
@@ -93,10 +95,12 @@ export class PatientsService {
 
   async timeline(user: AuthUser, patientId: string, ip?: string) {
     await this.access.assert(user, patientId, 'timeline', 'Chronologie de soins', ip);
+    // Les ordonnances ont leur propre volet de partage : sans lui, elles n'apparaissent pas dans la chronologie.
+    const withRx = (await this.access.decide(user, patientId, 'prescriptions')).allowed;
     const [encounters, tele, rx] = await Promise.all([
       this.prisma.encounter.findMany({ where: { patientId }, orderBy: { date: 'desc' }, take: 60 }),
       this.prisma.teleExpertise.findMany({ where: { patientId, status: 'REPONDUE' }, orderBy: { answeredAt: 'desc' }, take: 20 }),
-      this.prisma.prescription.findMany({ where: { patientId }, orderBy: { issuedAt: 'desc' }, take: 20 }),
+      withRx ? this.prisma.prescription.findMany({ where: { patientId }, orderBy: { issuedAt: 'desc' }, take: 20 }) : Promise.resolve([]),
     ]);
     const items = [
       ...encounters.map((e) => ({
@@ -192,10 +196,12 @@ export class PatientsService {
     });
   }
 
+  /** Un document, pour l'ouvrir ou le télécharger : volet « documents » exigé, chaque ouverture est journalisée avec son titre. */
   async document(user: AuthUser, patientId: string, docId: string, ip?: string) {
-    await this.access.assert(user, patientId, 'documents', 'Ouverture de document', ip);
     const d = await this.prisma.documentRef.findFirst({ where: { id: docId, patientId } });
-    if (!d) throw new NotFoundException();
+    // Le titre n'entre au journal que si le document existe ; le refus est journalisé dans tous les cas.
+    await this.access.assert(user, patientId, 'documents', d ? `Document « ${d.title} »` : 'Ouverture de document', ip);
+    if (!d) throw new NotFoundException('Document introuvable');
     return d;
   }
 
@@ -356,8 +362,14 @@ export class PatientsService {
   async accessLog(user: AuthUser, patientIdParam?: string) {
     const patientId = patientIdParam ?? this.ownPatientId(user);
     if (patientIdParam) await this.access.assert(user, patientIdParam, 'summary', "Journal d'accès");
+    // Écoute psychologique (compartiment sensible) : visible du titulaire seulement, jamais d'un aidant.
+    const owner = patientId === user.patientId;
     const rows = await this.prisma.auditEvent.findMany({
-      where: { patientId, action: { notIn: ['LOGIN'] }, NOT: { actorId: user.id, action: 'READ' } },
+      where: {
+        patientId,
+        action: { notIn: ['LOGIN'] },
+        NOT: [{ actorId: user.id, action: 'READ' }, ...(owner ? [] : [{ resource: { startsWith: LISTEN_AUDIT_PREFIX } }])],
+      },
       orderBy: { at: 'desc' },
       take: 100,
     });

@@ -62,8 +62,8 @@ export class EncounterDto {
 export class DelegationDto {
   @ApiProperty({ example: '0197000002' }) @IsString() phone: string;
   @ApiProperty({ example: 'mère' }) @IsString() @Length(2, 30) relation: string;
-  @ApiProperty({ isArray: true, example: ['summary', 'reminders'] })
+  @ApiProperty({ isArray: true, example: ['summary', 'reminders'], description: 'orders : commander les médicaments et suivre les commandes (module orders)' })
   @IsArray()
-  @IsIn(['summary', 'reminders', 'timeline', 'blood', 'all'], { each: true })
+  @IsIn(['summary', 'reminders', 'timeline', 'blood', 'appointments', 'orders', 'all'], { each: true })
   scopes: string[];
 }

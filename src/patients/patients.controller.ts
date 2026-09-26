@@ -1,6 +1,6 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
-import type { Request } from 'express';
+import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
+import { ApiOperation, ApiProduces, ApiQuery, ApiTags } from '@nestjs/swagger';
+import type { Request, Response } from 'express';
 import { AuthUser, CurrentUser, Roles } from '../common/auth-user';
 import { DelegationDto, DocumentDto, EncounterDto, ObservationDto, RedeemDto, ShareDto } from './patients.dto';
 import { PatientsService } from './patients.service';
@@ -106,9 +106,37 @@ export class PatientsController {
     return this.svc.documents(u, id, req.ip);
   }
 
+  /**
+   * Ouvre ou télécharge un document. Un lien du navigateur reçoit le fichier lui-même (bon type MIME,
+   * `?download=1` pour l'enregistrer) ; un appel `Accept: application/json` reçoit { mime, dataB64 } (carnet hors ligne).
+   */
   @Get('patients/:id/documents/:docId')
-  document(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Param('docId', ParseUUIDPipe) docId: string, @Req() req: Request) {
-    return this.svc.document(u, id, docId, req.ip);
+  @ApiOperation({ summary: 'Fichier du document (volet « documents » exigé, ouverture journalisée)' })
+  @ApiProduces('image/jpeg', 'image/png', 'image/webp', 'application/pdf', 'application/json')
+  @ApiQuery({ name: 'download', required: false, description: '1 : enregistrer le fichier au lieu de l’afficher' })
+  async document(
+    @CurrentUser() u: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('docId', ParseUUIDPipe) docId: string,
+    @Query('download') download: string | undefined,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const d = await this.svc.document(u, id, docId, req.ip);
+    const accept = req.headers.accept ?? '';
+    if (download === undefined && accept.includes('application/json')) return d;
+    const buf = Buffer.from(d.dataB64, 'base64');
+    const ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf' }[d.mime] ?? 'bin';
+    const name = `${d.title.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'document'}.${ext}`;
+    res.set({
+      'Content-Type': d.mime,
+      'Content-Length': String(buf.length),
+      'Content-Disposition': `${download !== undefined ? 'attachment' : 'inline'}; filename="${name.replace(/[^\x20-\x7e]/g, '_')}"; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'Cache-Control': 'private, no-store',
+      // Le lecteur PDF du navigateur est un objet intégré : la politique générale (object-src 'none') le bloquerait.
+      'Content-Security-Policy': "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; object-src 'self'; frame-ancestors 'self'",
+    });
+    return new StreamableFile(buf);
   }
 
   @Post('patients/:id/documents')
