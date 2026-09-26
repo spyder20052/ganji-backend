@@ -4,6 +4,7 @@ import { AuditService } from '../common/audit.service';
 import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { OutboxService } from '../common/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { CircleService } from '../circle/circle.service';
 import { SymptomDto, TeleAnswerDto, TeleRequestDto } from './care.dto';
 import { specialtyLabel } from '../data/specialties';
 
@@ -29,6 +30,7 @@ export class CareService {
     private readonly access: AccessService,
     private readonly audit: AuditService,
     private readonly outbox: OutboxService,
+    private readonly circle: CircleService,
   ) {}
 
   private async resolvePatient(user: AuthUser, patientId?: string) {
@@ -55,11 +57,12 @@ export class CareService {
     };
   }
 
-  async confirmReminder(user: AuthUser, id: string) {
-    const r = await this.prisma.reminder.findUnique({ where: { id } });
-    if (!r) throw new NotFoundException();
-    await this.resolvePatient(user, r.patientId === user.patientId ? undefined : r.patientId);
-    return this.prisma.reminder.update({ where: { id }, data: { confirmedAt: new Date() } });
+  /**
+   * Même règle que « C'est fait » du cercle de soins (point unique) : patient ou aidant ayant le droit
+   * « rappels », dans la fenêtre de confirmation, écriture journalisée.
+   */
+  confirmReminder(user: AuthUser, id: string) {
+    return this.circle.confirm(user, id);
   }
 
   async logSymptom(user: AuthUser, dto: SymptomDto) {

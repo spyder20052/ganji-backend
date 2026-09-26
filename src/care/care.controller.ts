@@ -15,6 +15,7 @@ export class CareController {
     return this.svc.plan(u, patientId);
   }
 
+  @Roles('PATIENT', 'CAREGIVER')
   @Post('reminders/:id/confirm')
   @HttpCode(200)
   confirm(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
