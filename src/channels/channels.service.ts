@@ -57,9 +57,13 @@ export class ChannelsService {
     return ok;
   }
 
+  /**
+   * Messages d'un numéro saisi explicitement (démo uniquement : le simulateur tient lieu d'agrégateur SMS,
+   * c'est le seul moyen de recevoir son code après une inscription). Seul le fil public reste limité aux
+   * numéros de démonstration.
+   */
   async outboxFor(rawPhone: string) {
     const to = normalizePhone(rawPhone);
-    if (!(await this.simulatorPhones([to])).has(to)) return [];
     return this.prisma.outbox.findMany({ where: { to }, orderBy: { createdAt: 'desc' }, take: 40 });
   }
 
