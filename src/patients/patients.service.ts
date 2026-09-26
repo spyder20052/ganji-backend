@@ -4,6 +4,7 @@ import { AccessService, Scope } from '../common/access.service';
 import { AuditService } from '../common/audit.service';
 import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
+import { sms } from '../common/i18n';
 import { OutboxService } from '../common/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizePhone } from '../auth/auth.dto';
@@ -416,7 +417,7 @@ export class PatientsService {
         channel: 'SMS',
         to: caregiver.phone,
         lang: caregiver.lang,
-        body: `Ganji : ${user.name} vous a désigné comme aidant. Ouvrez Ganji pour voir ce que vous pouvez faire pour lui.`,
+        body: sms('patients.caregiverAdded', caregiver.lang, { name: user.name }),
         ref: `delegation:${d.id}`,
       });
     }

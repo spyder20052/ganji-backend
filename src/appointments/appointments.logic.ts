@@ -1,16 +1,20 @@
+import type { Lang } from '@prisma/client';
+import { clock, label, sms, TZ, weekdayDate } from '../common/i18n';
+
 /**
  * Ce que la personne choisit pour prendre rendez-vous : un service compréhensible (« Enfant », « Cœur »),
- * rattaché aux spécialités des soignants inscrits dans chaque établissement.
+ * rattaché aux spécialités des soignants inscrits dans chaque établissement. Libellés : catalogue de textes
+ * (clés rdv.service.*).
  */
 export const SERVICES = {
-  GENERALE: { fr: 'consultation', en: 'consultation', matches: null, services: [] },
-  PEDIATRIE: { fr: 'pédiatrie', en: 'paediatrics', matches: ['PEDIATRIE'], services: ['pediatrie'] },
-  GYNECOLOGIE: { fr: 'santé de la femme', en: "women's health", matches: ['GYNECOLOGIE', 'SAGE_FEMME'], services: ['maternite'] },
-  CARDIOLOGIE: { fr: 'cardiologie', en: 'cardiology', matches: ['CARDIOLOGIE'], services: [] },
-  HEMATOLOGIE: { fr: 'hématologie', en: 'haematology', matches: ['HEMATOLOGIE'], services: ['hematologie'] },
-  DERMATOLOGIE: { fr: 'dermatologie', en: 'dermatology', matches: ['DERMATOLOGIE'], services: [] },
-  ONCOLOGIE: { fr: 'oncologie', en: 'oncology', matches: ['ONCOLOGIE'], services: ['oncologie'] },
-} as const satisfies Record<string, { fr: string; en: string; matches: readonly string[] | null; services: readonly string[] }>;
+  GENERALE: { matches: null, services: [] },
+  PEDIATRIE: { matches: ['PEDIATRIE'], services: ['pediatrie'] },
+  GYNECOLOGIE: { matches: ['GYNECOLOGIE', 'SAGE_FEMME'], services: ['maternite'] },
+  CARDIOLOGIE: { matches: ['CARDIOLOGIE'], services: [] },
+  HEMATOLOGIE: { matches: ['HEMATOLOGIE'], services: ['hematologie'] },
+  DERMATOLOGIE: { matches: ['DERMATOLOGIE'], services: [] },
+  ONCOLOGIE: { matches: ['ONCOLOGIE'], services: ['oncologie'] },
+} as const satisfies Record<string, { matches: readonly string[] | null; services: readonly string[] }>;
 
 export type ServiceCode = keyof typeof SERVICES;
 export const SERVICE_CODES = Object.keys(SERVICES) as ServiceCode[];
@@ -35,13 +39,12 @@ export function staffFilter(code: ServiceCode | undefined, roles: readonly ('PRA
 
 /** « Consultation hématologie » : titre du rappel dans le carnet (jamais envoyé par SMS). */
 export function reminderTitle(code: string) {
-  const s = SERVICES[code as ServiceCode];
-  return !s || code === 'GENERALE' ? 'Consultation' : `Consultation ${s.fr}`;
+  return !(code in SERVICES) || code === 'GENERALE' ? 'Consultation' : `Consultation ${serviceLabel(code, 'fr')}`;
 }
 
-export const serviceLabel = (code: string, lang: 'fr' | 'en' = 'fr') => SERVICES[code as ServiceCode]?.[lang] ?? code.toLowerCase();
+/** Libellé du service dans la langue du destinataire (notifications des soignants). */
+export const serviceLabel = (code: string, lang: Lang = 'fr') => label('rdv.service', code, lang, code.toLowerCase());
 
-const TZ = 'Africa/Porto-Novo';
 const DAY = 86_400_000;
 
 /** Début de la journée (heure du Bénin) contenant `d`. */
@@ -65,24 +68,14 @@ export function partOfDay(d: Date): 'MATIN' | 'APRES_MIDI' {
 }
 
 /** « jeudi 3 octobre à 9 h 00 » / « Thursday 3 October at 09:00 », pour les SMS et les notifications. */
-export function when(d: Date, lang: 'fr' | 'en' = 'fr'): string {
-  if (lang === 'en') {
-    const day = d.toLocaleDateString('en-GB', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' });
-    const time = d.toLocaleTimeString('en-GB', { timeZone: TZ, hour: '2-digit', minute: '2-digit' });
-    return `${day} at ${time}`;
-  }
-  const day = d.toLocaleDateString('fr-FR', { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' });
-  const [h, m] = d.toLocaleTimeString('fr-FR', { timeZone: TZ, hour: '2-digit', minute: '2-digit' }).split(':');
-  return `${day} à ${Number(h)} h ${m}`;
+export function when(d: Date, lang: Lang = 'fr'): string {
+  return sms('date.at', lang, { day: (l) => weekdayDate(d, l), time: (l) => clock(d, l) });
 }
 
 /** « jeudi 3 octobre, le matin » : le souhait de la personne, sans heure précise. */
-export function preferredText(d: Date, lang: 'fr' | 'en' = 'fr'): string {
-  const locale = lang === 'en' ? 'en-GB' : 'fr-FR';
-  const day = d.toLocaleDateString(locale, { timeZone: TZ, weekday: 'long', day: 'numeric', month: 'long' });
-  const part = partOfDay(d);
-  if (lang === 'en') return `${day}, ${part === 'MATIN' ? 'morning' : 'afternoon'}`;
-  return `${day}, ${part === 'MATIN' ? 'le matin' : 'l’après-midi'}`;
+export function preferredText(d: Date, lang: Lang = 'fr'): string {
+  const part = partOfDay(d) === 'MATIN' ? 'date.morning' : 'date.afternoon';
+  return sms('date.dayPart', lang, { day: (l) => weekdayDate(d, l), part: (l) => sms(part, l) });
 }
 
 export type Status = 'DEMANDE' | 'CONFIRME' | 'REFUSE' | 'ANNULE' | 'FAIT';

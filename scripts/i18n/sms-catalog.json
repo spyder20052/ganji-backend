@@ -1,0 +1,1659 @@
+{
+  "about": "Textes envoyés par Ganji (SMS, messages vocaux, notifications, USSD). Traduire le français ; garder les variables {x} ; jamais de donnée médicale. Traductions : src/common/i18n/<langue>.ts.",
+  "count": 214,
+  "keys": {
+    "alerts.broadcast": {
+      "module": "alerts",
+      "fr": "Ganji · {title} : {message}",
+      "en": "Ganji · {title}: {message}",
+      "vars": [
+        "message",
+        "title"
+      ]
+    },
+    "alerts.cluster.sms": {
+      "module": "alerts",
+      "fr": "Ganji surveillance : {title}. Voir le tableau de bord.",
+      "en": "Ganji surveillance: {title}. See the dashboard.",
+      "vars": [
+        "title"
+      ]
+    },
+    "alerts.cluster.title": {
+      "module": "alerts",
+      "fr": "Regroupement de cas : {syndrome} à {commune}",
+      "en": "Case cluster: {syndrome} in {commune}",
+      "vars": [
+        "commune",
+        "syndrome"
+      ]
+    },
+    "alerts.syndrome.DECES_INEXPLIQUE": {
+      "module": "alerts",
+      "fr": "décès inexpliqué",
+      "en": "unexplained death",
+      "vars": []
+    },
+    "alerts.syndrome.DIARRHEE": {
+      "module": "alerts",
+      "fr": "diarrhées aiguës",
+      "en": "acute diarrhoea",
+      "vars": []
+    },
+    "alerts.syndrome.FIEVRE_ERUPTION": {
+      "module": "alerts",
+      "fr": "fièvre avec éruption",
+      "en": "fever with rash",
+      "vars": []
+    },
+    "alerts.syndrome.FIEVRE_HEMORRAGIQUE": {
+      "module": "alerts",
+      "fr": "fièvre avec saignements",
+      "en": "fever with bleeding",
+      "vars": []
+    },
+    "alerts.syndrome.PARALYSIE": {
+      "module": "alerts",
+      "fr": "paralysie soudaine",
+      "en": "sudden paralysis",
+      "vars": []
+    },
+    "alerts.syndrome.TOUX": {
+      "module": "alerts",
+      "fr": "toux et fièvre",
+      "en": "cough and fever",
+      "vars": []
+    },
+    "auth.newLogin": {
+      "module": "auth",
+      "fr": "Ganji : nouvelle connexion à votre compte. Si ce n'est pas vous, appelez le relais de votre commune.",
+      "en": "Ganji: new login to your account. If this was not you, call the community relay of your area.",
+      "vars": []
+    },
+    "auth.otp": {
+      "module": "auth",
+      "fr": "Ganji : votre code de connexion est {code}. Il expire dans 5 minutes. Ne le communiquez à personne.",
+      "en": "Ganji: your login code is {code}. It expires in 5 minutes. Do not share it with anyone.",
+      "vars": [
+        "code"
+      ]
+    },
+    "blood.ants.request": {
+      "module": "blood",
+      "fr": "Ganji ANTS : nouvelle demande de {qty} poche(s) de {product} {group} à {place} ({urgency}). Ouvrez Ganji pour réserver des poches.",
+      "en": "Ganji ANTS: new request for {qty} unit(s) of {product} {group} at {place} ({urgency}). Open Ganji to reserve units.",
+      "vars": [
+        "group",
+        "place",
+        "product",
+        "qty",
+        "urgency"
+      ]
+    },
+    "blood.donor.call": {
+      "module": "blood",
+      "fr": "Ganji : {name}, votre don de sang ({group}) peut sauver une vie à {place}, à {km} km. Répondez 1 pour OUI ou 2 pour NON.",
+      "en": "Ganji: {name}, your blood donation ({group}) can save a life at {place}, {km} km away. Reply 1 for YES or 2 for NO.",
+      "vars": [
+        "group",
+        "km",
+        "name",
+        "place"
+      ]
+    },
+    "blood.donor.covered": {
+      "module": "blood",
+      "fr": "Ganji : merci ! Le besoin de sang à {place} est couvert. Inutile de vous déplacer.",
+      "en": "Ganji: thank you! The blood need at {place} is covered. No need to come.",
+      "vars": [
+        "place"
+      ]
+    },
+    "blood.donor.declined": {
+      "module": "blood",
+      "fr": "Ganji : merci de votre réponse. Nous vous solliciterons une autre fois.",
+      "en": "Ganji: thank you for your answer. We will ask you another time.",
+      "vars": []
+    },
+    "blood.donor.gave": {
+      "module": "blood",
+      "fr": "Ganji : merci pour votre don, {name} ! Vous avez peut-être sauvé une vie. Prochain don possible à partir du {date}.",
+      "en": "Ganji: thank you for your donation, {name}! You may have saved a life. You can give again from {date}.",
+      "vars": [
+        "date",
+        "name"
+      ]
+    },
+    "blood.donor.rdv": {
+      "module": "blood",
+      "fr": "Ganji : merci {name} ! Rendez-vous {when} à {place}, service de transfusion. Venez avec une pièce d’identité, après avoir mangé.",
+      "en": "Ganji: thank you {name}! Appointment {when} at {place}, blood transfusion unit. Bring an ID card and eat before coming.",
+      "vars": [
+        "name",
+        "place",
+        "when"
+      ]
+    },
+    "blood.donor.voice": {
+      "module": "blood",
+      "fr": "Appel vocal : appel au don de sang à {place}. Tapez 1 pour oui, 2 pour non.",
+      "en": "Voice call: blood donation needed at {place}. Press 1 for yes, 2 for no.",
+      "vars": [
+        "place"
+      ]
+    },
+    "blood.family.discreet": {
+      "module": "blood",
+      "fr": "Ganji : vous avez un nouveau message. Ouvrez l’application.",
+      "en": "Ganji: you have a new message. Open the app.",
+      "vars": []
+    },
+    "blood.family.news": {
+      "module": "blood",
+      "fr": "Ganji : bonne nouvelle pour {prenom}, ouvrez l’application.",
+      "en": "Ganji: good news for {prenom}, open the app.",
+      "vars": [
+        "prenom"
+      ]
+    },
+    "blood.family.news.voice": {
+      "module": "blood",
+      "fr": "Message vocal : bonne nouvelle pour {prenom}. Ouvrez l’application Ganji.",
+      "en": "Voice message: good news for {prenom}. Open the Ganji app.",
+      "vars": [
+        "prenom"
+      ]
+    },
+    "blood.group.compatible": {
+      "module": "blood",
+      "fr": "{group}, compatible",
+      "en": "{group}, compatible",
+      "vars": [
+        "group"
+      ]
+    },
+    "blood.n.ants.body.one": {
+      "module": "blood",
+      "fr": "{n} poche de {product} {group}, {urgency}, avant {when}. Demandée par {requester}.",
+      "en": "{n} unit of {product} {group}, {urgency}, before {when}. Requested by {requester}.",
+      "vars": [
+        "group",
+        "n",
+        "product",
+        "requester",
+        "urgency",
+        "when"
+      ]
+    },
+    "blood.n.ants.body.other": {
+      "module": "blood",
+      "fr": "{n} poches de {product} {group}, {urgency}, avant {when}. Demandée par {requester}.",
+      "en": "{n} units of {product} {group}, {urgency}, before {when}. Requested by {requester}.",
+      "vars": [
+        "group",
+        "n",
+        "product",
+        "requester",
+        "urgency",
+        "when"
+      ]
+    },
+    "blood.n.ants.title": {
+      "module": "blood",
+      "fr": "Demande de sang {group} · {place}",
+      "en": "Blood request {group} · {place}",
+      "vars": [
+        "group",
+        "place"
+      ]
+    },
+    "blood.n.call.body": {
+      "module": "blood",
+      "fr": "{place}, à {km} km : un patient a besoin de votre groupe ({group}). Répondez oui ou non.",
+      "en": "{place}, {km} km away: a patient needs your blood group ({group}). Answer yes or no.",
+      "vars": [
+        "group",
+        "km",
+        "place"
+      ]
+    },
+    "blood.n.call.title": {
+      "module": "blood",
+      "fr": "Votre sang peut sauver une vie",
+      "en": "Your blood can save a life",
+      "vars": []
+    },
+    "blood.n.family.body": {
+      "module": "blood",
+      "fr": "Un donneur a dit oui. Détails dans la page Sang.",
+      "en": "A donor said yes. Details on the Blood page.",
+      "vars": []
+    },
+    "blood.n.family.discreet.body": {
+      "module": "blood",
+      "fr": "Ouvrez la page Sang.",
+      "en": "Open the Blood page.",
+      "vars": []
+    },
+    "blood.n.family.discreet.title": {
+      "module": "blood",
+      "fr": "Nouveau message",
+      "en": "New message",
+      "vars": []
+    },
+    "blood.n.family.title": {
+      "module": "blood",
+      "fr": "Bonne nouvelle pour {prenom}",
+      "en": "Good news for {prenom}",
+      "vars": [
+        "prenom"
+      ]
+    },
+    "blood.n.found.APP": {
+      "module": "blood",
+      "fr": "{donor} ({group}, {km} km) a dit oui dans l’application. Rendez-vous {when} à {place}.",
+      "en": "{donor} ({group}, {km} km) said yes in the app. Appointment {when} at {place}.",
+      "vars": [
+        "donor",
+        "group",
+        "km",
+        "place",
+        "when"
+      ]
+    },
+    "blood.n.found.SMS": {
+      "module": "blood",
+      "fr": "{donor} ({group}, {km} km) a répondu 1 par SMS. Rendez-vous {when} à {place}.",
+      "en": "{donor} ({group}, {km} km) replied 1 by SMS. Appointment {when} at {place}.",
+      "vars": [
+        "donor",
+        "group",
+        "km",
+        "place",
+        "when"
+      ]
+    },
+    "blood.n.found.title": {
+      "module": "blood",
+      "fr": "Donneur trouvé pour {prenom}",
+      "en": "Donor found for {prenom}",
+      "vars": [
+        "prenom"
+      ]
+    },
+    "blood.n.found.USSD": {
+      "module": "blood",
+      "fr": "{donor} ({group}, {km} km) a répondu par USSD. Rendez-vous {when} à {place}.",
+      "en": "{donor} ({group}, {km} km) replied by USSD. Appointment {when} at {place}.",
+      "vars": [
+        "donor",
+        "group",
+        "km",
+        "place",
+        "when"
+      ]
+    },
+    "blood.n.found.volunteer": {
+      "module": "blood",
+      "fr": "{donor} ({group}, {km} km) s’est proposé. Rendez-vous {when} à {place}.",
+      "en": "{donor} ({group}, {km} km) volunteered. Appointment {when} at {place}.",
+      "vars": [
+        "donor",
+        "group",
+        "km",
+        "place",
+        "when"
+      ]
+    },
+    "blood.n.rdv.body": {
+      "module": "blood",
+      "fr": "{when} à {place}, service de transfusion. Venez après avoir mangé, avec une pièce d’identité.",
+      "en": "{when} at {place}, blood transfusion unit. Eat before coming and bring an ID card.",
+      "vars": [
+        "place",
+        "when"
+      ]
+    },
+    "blood.n.rdv.title": {
+      "module": "blood",
+      "fr": "Merci ! Votre rendez-vous de don",
+      "en": "Thank you! Your donation appointment",
+      "vars": []
+    },
+    "blood.n.reserved.body": {
+      "module": "blood",
+      "fr": "{site} a mis de côté {units} ({product}).",
+      "en": "{site} set aside {units} ({product}).",
+      "vars": [
+        "product",
+        "site",
+        "units"
+      ]
+    },
+    "blood.n.reserved.bodyCovered": {
+      "module": "blood",
+      "fr": "{site} a mis de côté {units} ({product}). Le besoin est couvert.",
+      "en": "{site} set aside {units} ({product}). The need is covered.",
+      "vars": [
+        "product",
+        "site",
+        "units"
+      ]
+    },
+    "blood.n.reserved.title.one": {
+      "module": "blood",
+      "fr": "{n} poche réservée pour {prenom}",
+      "en": "{n} unit reserved for {prenom}",
+      "vars": [
+        "n",
+        "prenom"
+      ]
+    },
+    "blood.n.reserved.title.other": {
+      "module": "blood",
+      "fr": "{n} poches réservées pour {prenom}",
+      "en": "{n} units reserved for {prenom}",
+      "vars": [
+        "n",
+        "prenom"
+      ]
+    },
+    "blood.n.thanks.body": {
+      "module": "blood",
+      "fr": "Vous avez peut-être sauvé une vie. Prochain don possible à partir du {date}.",
+      "en": "You may have saved a life. You can give again from {date}.",
+      "vars": [
+        "date"
+      ]
+    },
+    "blood.n.thanks.title": {
+      "module": "blood",
+      "fr": "Merci pour votre don !",
+      "en": "Thank you for your donation!",
+      "vars": []
+    },
+    "blood.n.toReceive.body": {
+      "module": "blood",
+      "fr": "{summary} Demande {group}, {product}.",
+      "en": "{summary} Request {group}, {product}.",
+      "vars": [
+        "group",
+        "product",
+        "summary"
+      ]
+    },
+    "blood.n.toReceive.title": {
+      "module": "blood",
+      "fr": "Donneur à recevoir · {place}",
+      "en": "Donor to receive · {place}",
+      "vars": [
+        "place"
+      ]
+    },
+    "blood.product.CGR": {
+      "module": "blood",
+      "fr": "globules rouges",
+      "en": "red cells",
+      "vars": []
+    },
+    "blood.product.PLAQUETTES": {
+      "module": "blood",
+      "fr": "plaquettes",
+      "en": "platelets",
+      "vars": []
+    },
+    "blood.product.PLASMA": {
+      "module": "blood",
+      "fr": "plasma",
+      "en": "plasma",
+      "vars": []
+    },
+    "blood.requester.donor": {
+      "module": "blood",
+      "fr": "Ganji : un donneur {group} a dit oui pour votre demande à {place}. Rendez-vous {when}. Suivi en direct dans Ganji.",
+      "en": "Ganji: a {group} donor said yes to your request at {place}. Appointment {when}. Live follow-up in Ganji.",
+      "vars": [
+        "group",
+        "place",
+        "when"
+      ]
+    },
+    "blood.requester.reserved": {
+      "module": "blood",
+      "fr": "Ganji : {site} a réservé {n} poche(s) pour votre demande à {place}. Suivi en direct dans Ganji.",
+      "en": "Ganji: {site} reserved {n} unit(s) for your request at {place}. Live follow-up in Ganji.",
+      "vars": [
+        "n",
+        "place",
+        "site"
+      ]
+    },
+    "blood.urgency.PROGRAMMEE": {
+      "module": "blood",
+      "fr": "programmée",
+      "en": "planned",
+      "vars": []
+    },
+    "blood.urgency.URGENTE": {
+      "module": "blood",
+      "fr": "urgente",
+      "en": "urgent",
+      "vars": []
+    },
+    "blood.urgency.VITALE": {
+      "module": "blood",
+      "fr": "urgence vitale",
+      "en": "life-threatening",
+      "vars": []
+    },
+    "care.symptomAlert": {
+      "module": "care",
+      "fr": "Ganji : {name} a signalé un signe d'alerte. Ouvrez son carnet.",
+      "en": "Ganji: {name} reported a warning sign. Open their health record.",
+      "vars": [
+        "name"
+      ]
+    },
+    "care.tele.answered": {
+      "module": "care",
+      "fr": "Ganji : {name} a répondu à votre demande d'avis.",
+      "en": "Ganji: {name} answered your request for advice.",
+      "vars": [
+        "name"
+      ]
+    },
+    "care.tele.new": {
+      "module": "care",
+      "fr": "Ganji : nouvelle demande d'avis de {from}.",
+      "en": "Ganji: new request for advice from {from}.",
+      "vars": [
+        "from"
+      ]
+    },
+    "care.tele.newUrgent": {
+      "module": "care",
+      "fr": "Ganji : nouvelle demande d'avis URGENTE de {from}.",
+      "en": "Ganji: new URGENT request for advice from {from}.",
+      "vars": [
+        "from"
+      ]
+    },
+    "circle.n.done.body": {
+      "module": "circle",
+      "fr": "{name} a confirmé son rappel.",
+      "en": "{name} confirmed the reminder.",
+      "vars": [
+        "name"
+      ]
+    },
+    "circle.n.done.title": {
+      "module": "circle",
+      "fr": "C’est fait",
+      "en": "Done",
+      "vars": []
+    },
+    "circle.n.missed.body": {
+      "module": "circle",
+      "fr": "{name} n’a pas confirmé un rappel depuis 2 h. Prenez de ses nouvelles.",
+      "en": "{name} has not confirmed a reminder for 2 hours. Please check on them.",
+      "vars": [
+        "name"
+      ]
+    },
+    "circle.n.missed.title": {
+      "module": "circle",
+      "fr": "Rappel sans réponse",
+      "en": "Unanswered reminder",
+      "vars": []
+    },
+    "circle.n.self.body": {
+      "module": "circle",
+      "fr": "Touchez « C’est fait » si c’est fait. Votre cercle de soins est prévenu.",
+      "en": "Tap “Done” if it is done. Your circle of care has been told.",
+      "vars": []
+    },
+    "circle.n.visit.body": {
+      "module": "circle",
+      "fr": "{name}, {commune} : passer prendre des nouvelles.",
+      "en": "{name}, {commune}: drop by to check on them.",
+      "vars": [
+        "commune",
+        "name"
+      ]
+    },
+    "circle.n.visit.title": {
+      "module": "circle",
+      "fr": "Visite à faire",
+      "en": "Home visit to do",
+      "vars": []
+    },
+    "circle.n.visitCancelled.answered": {
+      "module": "circle",
+      "fr": "{name} a répondu à son rappel : la visite n’est plus nécessaire.",
+      "en": "{name} answered the reminder: the visit is no longer needed.",
+      "vars": [
+        "name"
+      ]
+    },
+    "circle.n.visitCancelled.body": {
+      "module": "circle",
+      "fr": "{name} a confirmé son rappel : la visite n’est plus nécessaire.",
+      "en": "{name} confirmed the reminder: the visit is no longer needed.",
+      "vars": [
+        "name"
+      ]
+    },
+    "circle.n.visitCancelled.title": {
+      "module": "circle",
+      "fr": "Visite annulée",
+      "en": "Visit cancelled",
+      "vars": []
+    },
+    "circle.n.visitDone.body": {
+      "module": "circle",
+      "fr": "{relay} est passé prendre de vos nouvelles.",
+      "en": "{relay} dropped by to check on you.",
+      "vars": [
+        "relay"
+      ]
+    },
+    "circle.n.visitDone.title": {
+      "module": "circle",
+      "fr": "Visite faite",
+      "en": "Visit done",
+      "vars": []
+    },
+    "circle.n.visitDoneCg.body": {
+      "module": "circle",
+      "fr": "{relay} est passé voir {name}.",
+      "en": "{relay} visited {name}.",
+      "vars": [
+        "name",
+        "relay"
+      ]
+    },
+    "circle.n.visitPlanned.body": {
+      "module": "circle",
+      "fr": "{relay} passera prendre de vos nouvelles.",
+      "en": "{relay} will drop by to check on you.",
+      "vars": [
+        "relay"
+      ]
+    },
+    "circle.n.visitPlanned.title": {
+      "module": "circle",
+      "fr": "Visite du relais",
+      "en": "Community relay visit",
+      "vars": []
+    },
+    "circle.sms.missed": {
+      "module": "circle",
+      "fr": "Ganji : {name} n’a pas confirmé un rappel. Prenez de ses nouvelles. Répondez 1 si c’est fait.",
+      "en": "Ganji: {name} has not confirmed a reminder. Please check on them. Reply 1 if it is done.",
+      "vars": [
+        "name"
+      ]
+    },
+    "circle.sms.missed.discreet": {
+      "module": "circle",
+      "fr": "Ganji : un rappel de votre proche n’a pas été confirmé. Prenez de ses nouvelles. Répondez 1 si c’est fait.",
+      "en": "Ganji: a reminder for your relative has not been confirmed. Please check on them. Reply 1 if it is done.",
+      "vars": []
+    },
+    "circle.sms.visit": {
+      "module": "circle",
+      "fr": "Ganji : une visite à domicile vous est demandée. Ouvrez l’application Ganji pour voir où et quand.",
+      "en": "Ganji: a home visit is requested. Open the Ganji app to see where and when.",
+      "vars": []
+    },
+    "circle.sms.visitDone": {
+      "module": "circle",
+      "fr": "Ganji : le relais est passé voir {name}. Détails dans l’application.",
+      "en": "Ganji: the community relay visited {name}. Details in the app.",
+      "vars": [
+        "name"
+      ]
+    },
+    "circle.sms.visitDone.discreet": {
+      "module": "circle",
+      "fr": "Ganji : le relais est passé voir votre proche. Détails dans l’application.",
+      "en": "Ganji: the community relay visited your relative. Details in the app.",
+      "vars": []
+    },
+    "date.afternoon": {
+      "module": "common",
+      "fr": "l’après-midi",
+      "en": "afternoon",
+      "vars": []
+    },
+    "date.at": {
+      "module": "common",
+      "fr": "{day} à {time}",
+      "en": "{day} at {time}",
+      "vars": [
+        "day",
+        "time"
+      ]
+    },
+    "date.dayPart": {
+      "module": "common",
+      "fr": "{day}, {part}",
+      "en": "{day}, {part}",
+      "vars": [
+        "day",
+        "part"
+      ]
+    },
+    "date.morning": {
+      "module": "common",
+      "fr": "le matin",
+      "en": "morning",
+      "vars": []
+    },
+    "emergency.breakGlass": {
+      "module": "emergency",
+      "fr": "Ganji : un soignant ({name}) a ouvert votre dossier en urgence. Motif enregistré. Vous pouvez le voir dans votre journal d'accès.",
+      "en": "Ganji: a health worker ({name}) opened your record in an emergency. The reason is recorded. You can see it in your access log.",
+      "vars": [
+        "name"
+      ]
+    },
+    "emergency.breakGlass.control": {
+      "module": "emergency",
+      "fr": "Contrôle : accès bris de glace par {name}",
+      "en": "Audit: break-glass access by {name}",
+      "vars": [
+        "name"
+      ]
+    },
+    "emergency.cardRead": {
+      "module": "emergency",
+      "fr": "Ganji : votre carte d'urgence vient d'être consultée. Si ce n'est pas normal, contactez-nous.",
+      "en": "Ganji: your emergency card has just been viewed. If this is not expected, contact us.",
+      "vars": []
+    },
+    "emergency.sos": {
+      "module": "emergency",
+      "fr": "Ganji SOS : {prenom} a besoin d'aide.",
+      "en": "Ganji SOS: {prenom} needs help.",
+      "vars": [
+        "prenom"
+      ]
+    },
+    "emergency.sos.position": {
+      "module": "emergency",
+      "fr": "Ganji SOS : {prenom} a besoin d'aide. Position : {url}",
+      "en": "Ganji SOS: {prenom} needs help. Location: {url}",
+      "vars": [
+        "prenom",
+        "url"
+      ]
+    },
+    "listen.n.callback.body": {
+      "module": "listen",
+      "fr": "Une personne demande à être rappelée.",
+      "en": "Someone asked to be called back.",
+      "vars": []
+    },
+    "listen.n.callback.title": {
+      "module": "listen",
+      "fr": "Écoute : rappel demandé",
+      "en": "Listening line: call-back requested",
+      "vars": []
+    },
+    "listen.n.closed.body": {
+      "module": "listen",
+      "fr": "L’écoutante a clos la conversation. Vous pouvez en ouvrir une autre à tout moment.",
+      "en": "The listener closed the conversation. You can open a new one at any time.",
+      "vars": []
+    },
+    "listen.n.closed.title": {
+      "module": "listen",
+      "fr": "Conversation close",
+      "en": "Conversation closed",
+      "vars": []
+    },
+    "listen.n.message.body": {
+      "module": "listen",
+      "fr": "La personne que vous accompagnez a écrit.",
+      "en": "The person you are supporting has written.",
+      "vars": []
+    },
+    "listen.n.message.title": {
+      "module": "listen",
+      "fr": "Écoute : nouveau message",
+      "en": "Listening line: new message",
+      "vars": []
+    },
+    "listen.n.new.body": {
+      "module": "listen",
+      "fr": "Une personne attend une réponse.",
+      "en": "Someone is waiting for a reply.",
+      "vars": []
+    },
+    "listen.n.new.title": {
+      "module": "listen",
+      "fr": "Écoute : nouvelle conversation",
+      "en": "Listening line: new conversation",
+      "vars": []
+    },
+    "listen.n.reply.body": {
+      "module": "listen",
+      "fr": "L’écoute vous a répondu. Ouvrez la conversation.",
+      "en": "The listening line has replied. Open the conversation.",
+      "vars": []
+    },
+    "listen.n.reply.title": {
+      "module": "listen",
+      "fr": "Nouveau message",
+      "en": "New message",
+      "vars": []
+    },
+    "listen.n.urgent.body": {
+      "module": "listen",
+      "fr": "Une personne a écrit des mots de détresse. Répondez en priorité.",
+      "en": "Someone wrote words of distress. Reply first.",
+      "vars": []
+    },
+    "listen.n.urgent.title": {
+      "module": "listen",
+      "fr": "Écoute : détresse signalée",
+      "en": "Listening line: distress detected",
+      "vars": []
+    },
+    "listen.reply": {
+      "module": "listen",
+      "fr": "Ganji : vous avez un nouveau message dans l'application.",
+      "en": "Ganji: you have a new message in the app.",
+      "vars": []
+    },
+    "maternal.danger": {
+      "module": "maternal",
+      "fr": "Ganji : {prenom} signale un signe de danger de grossesse. Merci de l'appeler et de l'accompagner à la maternité.",
+      "en": "Ganji: {prenom} reports a pregnancy danger sign. Please call her and go with her to the maternity unit.",
+      "vars": [
+        "prenom"
+      ]
+    },
+    "medications.dispensed": {
+      "module": "medications",
+      "fr": "Ganji : votre ordonnance a été délivrée par {pharmacy}.",
+      "en": "Ganji: your prescription was dispensed by {pharmacy}.",
+      "vars": [
+        "pharmacy"
+      ]
+    },
+    "order.accepted": {
+      "module": "orders",
+      "fr": "Ganji : {pharmacy} a accepté votre commande {ref}. Elle est en préparation.",
+      "en": "Ganji: {pharmacy} accepted your order {ref}. It is being prepared.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.cancelled": {
+      "module": "orders",
+      "fr": "Ganji : commande {ref} annulée.",
+      "en": "Ganji: order {ref} cancelled.",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.cash": {
+      "module": "orders",
+      "fr": "Prévoyez {amount} FCFA en espèces.",
+      "en": "Have {amount} FCFA in cash ready.",
+      "vars": [
+        "amount"
+      ]
+    },
+    "order.delivered": {
+      "module": "orders",
+      "fr": "Ganji : commande {ref} remise. Reçu {receipt}. Merci !",
+      "en": "Ganji: order {ref} handed over. Receipt {receipt}. Thank you!",
+      "vars": [
+        "receipt",
+        "ref"
+      ]
+    },
+    "order.dispatched": {
+      "module": "orders",
+      "fr": "Ganji : votre commande {ref} est en route. Livreur : {courier}, {courierPhone}. Donnez-lui le code {code} à la remise.",
+      "en": "Ganji: your order {ref} is on its way. Courier: {courier}, {courierPhone}. Give the code {code} on delivery.",
+      "vars": [
+        "code",
+        "courier",
+        "courierPhone",
+        "ref"
+      ]
+    },
+    "order.dispatched.family": {
+      "module": "orders",
+      "fr": "Ganji : la commande {ref} est en route. Livreur : {courier}, {courierPhone}.",
+      "en": "Ganji: order {ref} is on its way. Courier: {courier}, {courierPhone}.",
+      "vars": [
+        "courier",
+        "courierPhone",
+        "ref"
+      ]
+    },
+    "order.expired": {
+      "module": "orders",
+      "fr": "Ganji : {pharmacy} n’a pas répondu, commande {ref} annulée. Ouvrez Ganji pour commander ailleurs.",
+      "en": "Ganji: {pharmacy} did not answer, order {ref} cancelled. Open Ganji to order elsewhere.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.failed": {
+      "module": "orders",
+      "fr": "Ganji : la commande {ref} n’a pas pu être remise. Ouvrez Ganji pour voir pourquoi et commander à nouveau.",
+      "en": "Ganji: order {ref} could not be handed over. Open Ganji to see why and order again.",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.items.one": {
+      "module": "orders",
+      "fr": "{n} médicament",
+      "en": "{n} medicine",
+      "vars": [
+        "n"
+      ]
+    },
+    "order.items.other": {
+      "module": "orders",
+      "fr": "{n} médicaments",
+      "en": "{n} medicines",
+      "vars": [
+        "n"
+      ]
+    },
+    "order.mode.LIVRAISON": {
+      "module": "orders",
+      "fr": "livraison",
+      "en": "delivery",
+      "vars": []
+    },
+    "order.mode.RETRAIT": {
+      "module": "orders",
+      "fr": "retrait",
+      "en": "pickup",
+      "vars": []
+    },
+    "order.n.accepted.body": {
+      "module": "orders",
+      "fr": "{pharmacy} prépare votre commande {ref}.",
+      "en": "{pharmacy} is preparing your order {ref}.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.n.accepted.title": {
+      "module": "orders",
+      "fr": "Commande acceptée",
+      "en": "Order accepted",
+      "vars": []
+    },
+    "order.n.cancelled.body": {
+      "module": "orders",
+      "fr": "Commande {ref} annulée.",
+      "en": "Order {ref} cancelled.",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.n.cancelled.title": {
+      "module": "orders",
+      "fr": "Commande annulée",
+      "en": "Order cancelled",
+      "vars": []
+    },
+    "order.n.delivered.body": {
+      "module": "orders",
+      "fr": "Commande {ref} remise. Reçu {receipt}.",
+      "en": "Order {ref} handed over. Receipt {receipt}.",
+      "vars": [
+        "receipt",
+        "ref"
+      ]
+    },
+    "order.n.delivered.title": {
+      "module": "orders",
+      "fr": "Commande remise",
+      "en": "Order handed over",
+      "vars": []
+    },
+    "order.n.dispatched.body": {
+      "module": "orders",
+      "fr": "Livreur : {courier}, {courierPhone}. Code à donner : {code}.",
+      "en": "Courier: {courier}, {courierPhone}. Code to give: {code}.",
+      "vars": [
+        "code",
+        "courier",
+        "courierPhone"
+      ]
+    },
+    "order.n.dispatched.noCode": {
+      "module": "orders",
+      "fr": "Livreur : {courier}, {courierPhone}.",
+      "en": "Courier: {courier}, {courierPhone}.",
+      "vars": [
+        "courier",
+        "courierPhone"
+      ]
+    },
+    "order.n.dispatched.title": {
+      "module": "orders",
+      "fr": "Commande en route",
+      "en": "Order on its way",
+      "vars": []
+    },
+    "order.n.expired.body": {
+      "module": "orders",
+      "fr": "{pharmacy} n’a pas répondu à temps.",
+      "en": "{pharmacy} did not answer in time.",
+      "vars": [
+        "pharmacy"
+      ]
+    },
+    "order.n.expired.title": {
+      "module": "orders",
+      "fr": "Commande annulée",
+      "en": "Order cancelled",
+      "vars": []
+    },
+    "order.n.failed.body": {
+      "module": "orders",
+      "fr": "{pharmacy} : {reason}. Vous pouvez commander à nouveau.",
+      "en": "{pharmacy}: {reason}. You can order again.",
+      "vars": [
+        "pharmacy",
+        "reason"
+      ]
+    },
+    "order.n.failed.title": {
+      "module": "orders",
+      "fr": "Commande non remise",
+      "en": "Order not handed over",
+      "vars": []
+    },
+    "order.n.newCode.body": {
+      "module": "orders",
+      "fr": "Commande {ref} : votre nouveau code est {code}.",
+      "en": "Order {ref}: your new code is {code}.",
+      "vars": [
+        "code",
+        "ref"
+      ]
+    },
+    "order.n.newCode.title": {
+      "module": "orders",
+      "fr": "Nouveau code de remise",
+      "en": "New handover code",
+      "vars": []
+    },
+    "order.n.readyDelivery.body": {
+      "module": "orders",
+      "fr": "Votre commande {ref} part bientôt.",
+      "en": "Your order {ref} leaves soon.",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.n.readyDelivery.title": {
+      "module": "orders",
+      "fr": "Commande prête",
+      "en": "Order ready",
+      "vars": []
+    },
+    "order.n.readyPickup.body": {
+      "module": "orders",
+      "fr": "Votre commande {ref} vous attend chez {pharmacy}. Code : {code}.",
+      "en": "Your order {ref} is waiting at {pharmacy}. Code: {code}.",
+      "vars": [
+        "code",
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.n.readyPickup.noCode": {
+      "module": "orders",
+      "fr": "La commande {ref} attend chez {pharmacy}.",
+      "en": "Order {ref} is waiting at {pharmacy}.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.n.readyPickup.title": {
+      "module": "orders",
+      "fr": "Commande prête",
+      "en": "Order ready",
+      "vars": []
+    },
+    "order.n.received.body": {
+      "module": "orders",
+      "fr": "{pharmacy} a reçu votre commande {ref}. Code de remise : {code}.",
+      "en": "{pharmacy} received your order {ref}. Handover code: {code}.",
+      "vars": [
+        "code",
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.n.received.noCode": {
+      "module": "orders",
+      "fr": "{pharmacy} a reçu la commande {ref}.",
+      "en": "{pharmacy} received order {ref}.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.n.received.title": {
+      "module": "orders",
+      "fr": "Commande envoyée",
+      "en": "Order sent",
+      "vars": []
+    },
+    "order.n.refused.body": {
+      "module": "orders",
+      "fr": "{pharmacy} : {reason}.",
+      "en": "{pharmacy}: {reason}.",
+      "vars": [
+        "pharmacy",
+        "reason"
+      ]
+    },
+    "order.n.refused.title": {
+      "module": "orders",
+      "fr": "Commande refusée",
+      "en": "Order declined",
+      "vars": []
+    },
+    "order.n.staff.cancelled.body": {
+      "module": "orders",
+      "fr": "Annulée par le patient avant votre réponse.",
+      "en": "Cancelled by the patient before your answer.",
+      "vars": []
+    },
+    "order.n.staff.cancelled.title": {
+      "module": "orders",
+      "fr": "Commande {ref} annulée",
+      "en": "Order {ref} cancelled",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.n.staff.closed.body": {
+      "module": "orders",
+      "fr": "Non remise dans les délais : stock rendu, patient prévenu.",
+      "en": "Not handed over in time: stock returned, patient told.",
+      "vars": []
+    },
+    "order.n.staff.closed.title": {
+      "module": "orders",
+      "fr": "Commande {ref} clôturée",
+      "en": "Order {ref} closed",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.n.staff.expired.body": {
+      "module": "orders",
+      "fr": "Sans réponse de votre part : le patient a été prévenu.",
+      "en": "No answer from you: the patient has been told.",
+      "vars": []
+    },
+    "order.n.staff.expired.title": {
+      "module": "orders",
+      "fr": "Commande {ref} annulée",
+      "en": "Order {ref} cancelled",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.n.staff.new.body": {
+      "module": "orders",
+      "fr": "{patient} · {items} · {mode} · {total} FCFA",
+      "en": "{patient} · {items} · {mode} · {total} FCFA",
+      "vars": [
+        "items",
+        "mode",
+        "patient",
+        "total"
+      ]
+    },
+    "order.n.staff.new.bodyPaid": {
+      "module": "orders",
+      "fr": "{patient} · {items} · {mode} · {total} FCFA (payée)",
+      "en": "{patient} · {items} · {mode} · {total} FCFA (paid)",
+      "vars": [
+        "items",
+        "mode",
+        "patient",
+        "total"
+      ]
+    },
+    "order.n.staff.new.title": {
+      "module": "orders",
+      "fr": "Nouvelle commande {ref}",
+      "en": "New order {ref}",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.n.staff.waiting.body": {
+      "module": "orders",
+      "fr": "Un patient attend votre réponse depuis plus de 30 min.",
+      "en": "A patient has been waiting for your answer for over 30 min.",
+      "vars": []
+    },
+    "order.n.staff.waiting.title": {
+      "module": "orders",
+      "fr": "Commande {ref} en attente",
+      "en": "Order {ref} waiting",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.newcode": {
+      "module": "orders",
+      "fr": "Ganji : nouveau code de remise pour la commande {ref} : {code}. L’ancien ne marche plus.",
+      "en": "Ganji: new handover code for order {ref}: {code}. The old one no longer works.",
+      "vars": [
+        "code",
+        "ref"
+      ]
+    },
+    "order.paid": {
+      "module": "orders",
+      "fr": "Payé : {amount} FCFA ({provider}, reçu {receipt}).",
+      "en": "Paid: {amount} FCFA ({provider}, receipt {receipt}).",
+      "vars": [
+        "amount",
+        "provider",
+        "receipt"
+      ]
+    },
+    "order.pharmacy.reminder": {
+      "module": "orders",
+      "fr": "Ganji : la commande {ref} attend votre réponse depuis plus de 30 min. Ouvrez l’espace pharmacie.",
+      "en": "Ganji: order {ref} has been waiting for your answer for over 30 min. Open the pharmacy space.",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.ready.delivery": {
+      "module": "orders",
+      "fr": "Ganji : votre commande {ref} est prête. Le livreur part bientôt.",
+      "en": "Ganji: your order {ref} is ready. The courier leaves soon.",
+      "vars": [
+        "ref"
+      ]
+    },
+    "order.ready.pickup": {
+      "module": "orders",
+      "fr": "Ganji : votre commande {ref} est prête chez {pharmacy}. Venez avec le code {code}.",
+      "en": "Ganji: your order {ref} is ready at {pharmacy}. Come with the code {code}.",
+      "vars": [
+        "code",
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.ready.pickup.family": {
+      "module": "orders",
+      "fr": "Ganji : la commande {ref} est prête chez {pharmacy}.",
+      "en": "Ganji: order {ref} is ready at {pharmacy}.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.reason.late": {
+      "module": "orders",
+      "fr": "Commande non remise dans les délais",
+      "en": "Order not handed over in time",
+      "vars": []
+    },
+    "order.received": {
+      "module": "orders",
+      "fr": "Ganji : commande {ref} envoyée à {pharmacy}. Code de remise : {code}. Donnez-le seulement quand vous recevez la commande.",
+      "en": "Ganji: order {ref} sent to {pharmacy}. Handover code: {code}. Give it only when you receive the order.",
+      "vars": [
+        "code",
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.received.family": {
+      "module": "orders",
+      "fr": "Ganji : commande {ref} envoyée à {pharmacy}.",
+      "en": "Ganji: order {ref} sent to {pharmacy}.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "order.refunded": {
+      "module": "orders",
+      "fr": "{amount} FCFA remboursés sur votre compte mobile money.",
+      "en": "{amount} FCFA refunded to your mobile money account.",
+      "vars": [
+        "amount"
+      ]
+    },
+    "order.refused": {
+      "module": "orders",
+      "fr": "Ganji : {pharmacy} ne peut pas servir votre commande {ref}. Ouvrez Ganji pour voir pourquoi et commander ailleurs.",
+      "en": "Ganji: {pharmacy} cannot fill your order {ref}. Open Ganji to see why and order elsewhere.",
+      "vars": [
+        "pharmacy",
+        "ref"
+      ]
+    },
+    "patients.caregiverAdded": {
+      "module": "patients",
+      "fr": "Ganji : {name} vous a désigné comme aidant. Ouvrez Ganji pour voir ce que vous pouvez faire pour lui.",
+      "en": "Ganji: {name} named you as a caregiver. Open Ganji to see what you can do for them.",
+      "vars": [
+        "name"
+      ]
+    },
+    "profile.n.bloodVerified.body": {
+      "module": "profile",
+      "fr": "{name} a confirmé votre groupe sanguin : {group}.",
+      "en": "{name} confirmed your blood group: {group}.",
+      "vars": [
+        "group",
+        "name"
+      ]
+    },
+    "profile.n.bloodVerified.title": {
+      "module": "profile",
+      "fr": "Groupe sanguin vérifié",
+      "en": "Blood group verified",
+      "vars": []
+    },
+    "rappel.analyse": {
+      "module": "channels",
+      "fr": "Ganji : {prenom}, analyse {quand}{lieu}. Répondez 1 pour confirmer.",
+      "en": "Ganji: {prenom}, lab test {quand}{lieu}. Reply 1 to confirm.",
+      "vars": [
+        "lieu",
+        "prenom",
+        "quand"
+      ]
+    },
+    "rappel.cpn": {
+      "module": "channels",
+      "fr": "Ganji : {prenom}, consultation prénatale {quand}{lieu}. Répondez 1 pour confirmer.",
+      "en": "Ganji: {prenom}, antenatal visit {quand}{lieu}. Reply 1 to confirm.",
+      "vars": [
+        "lieu",
+        "prenom",
+        "quand"
+      ]
+    },
+    "rappel.discret.prise": {
+      "module": "channels",
+      "fr": "Ganji : rappel {quand}. Répondez 1 quand c’est fait.",
+      "en": "Ganji: reminder {quand}. Reply 1 when done.",
+      "vars": [
+        "quand"
+      ]
+    },
+    "rappel.discret.rdv": {
+      "module": "channels",
+      "fr": "Ganji : vous avez un rendez-vous {quand}. Répondez 1 pour confirmer.",
+      "en": "Ganji: you have an appointment {quand}. Reply 1 to confirm.",
+      "vars": [
+        "quand"
+      ]
+    },
+    "rappel.prise": {
+      "module": "channels",
+      "fr": "Ganji : {prenom}, prise de votre traitement {quand}. Répondez 1 quand c’est fait.",
+      "en": "Ganji: {prenom}, time for your treatment {quand}. Reply 1 when done.",
+      "vars": [
+        "prenom",
+        "quand"
+      ]
+    },
+    "rappel.rdv": {
+      "module": "channels",
+      "fr": "Ganji : {prenom}, rendez-vous {quand}{lieu}. Répondez 1 pour confirmer.",
+      "en": "Ganji: {prenom}, appointment {quand}{lieu}. Reply 1 to confirm.",
+      "vars": [
+        "lieu",
+        "prenom",
+        "quand"
+      ]
+    },
+    "rappel.vaccin": {
+      "module": "channels",
+      "fr": "Ganji : vaccin de votre enfant {quand}{lieu}. Apportez le carnet. Répondez 1 pour confirmer.",
+      "en": "Ganji: your child’s vaccine {quand}{lieu}. Bring the health book. Reply 1 to confirm.",
+      "vars": [
+        "lieu",
+        "quand"
+      ]
+    },
+    "rdv.confirmed": {
+      "module": "appointments",
+      "fr": "Ganji : votre rendez-vous est confirmé le {when} à {place}. Ouvrez Ganji pour les détails.",
+      "en": "Ganji: your appointment is confirmed for {when} at {place}. Open Ganji for details.",
+      "vars": [
+        "place",
+        "when"
+      ]
+    },
+    "rdv.confirmed.other": {
+      "module": "appointments",
+      "fr": "Ganji : le rendez-vous de {prenom} est confirmé le {when} à {place}.",
+      "en": "Ganji: {prenom}'s appointment is confirmed for {when} at {place}.",
+      "vars": [
+        "place",
+        "prenom",
+        "when"
+      ]
+    },
+    "rdv.discreet": {
+      "module": "appointments",
+      "fr": "Ganji : vous avez un nouveau message. Ouvrez l’application.",
+      "en": "Ganji: you have a new message. Open the app.",
+      "vars": []
+    },
+    "rdv.n.cancelled.body": {
+      "module": "appointments",
+      "fr": "{who} · {date}",
+      "en": "{who} · {date}",
+      "vars": [
+        "date",
+        "who"
+      ]
+    },
+    "rdv.n.cancelled.title": {
+      "module": "appointments",
+      "fr": "Rendez-vous annulé",
+      "en": "Appointment cancelled",
+      "vars": []
+    },
+    "rdv.n.confirmed.body": {
+      "module": "appointments",
+      "fr": "{place} · {when}",
+      "en": "{place} · {when}",
+      "vars": [
+        "place",
+        "when"
+      ]
+    },
+    "rdv.n.confirmed.bodyAnswer": {
+      "module": "appointments",
+      "fr": "{place} · {when} · {answer}",
+      "en": "{place} · {when} · {answer}",
+      "vars": [
+        "answer",
+        "place",
+        "when"
+      ]
+    },
+    "rdv.n.confirmed.title": {
+      "module": "appointments",
+      "fr": "Rendez-vous confirmé",
+      "en": "Appointment confirmed",
+      "vars": []
+    },
+    "rdv.n.refused.body": {
+      "module": "appointments",
+      "fr": "{place} : {answer}",
+      "en": "{place} : {answer}",
+      "vars": [
+        "answer",
+        "place"
+      ]
+    },
+    "rdv.n.refused.title": {
+      "module": "appointments",
+      "fr": "Rendez-vous impossible",
+      "en": "Appointment not possible",
+      "vars": []
+    },
+    "rdv.n.request.body": {
+      "module": "appointments",
+      "fr": "{who} · {service} · {preferred}",
+      "en": "{who} · {service} · {preferred}",
+      "vars": [
+        "preferred",
+        "service",
+        "who"
+      ]
+    },
+    "rdv.n.request.title": {
+      "module": "appointments",
+      "fr": "Nouvelle demande de rendez-vous",
+      "en": "New appointment request",
+      "vars": []
+    },
+    "rdv.refused": {
+      "module": "appointments",
+      "fr": "Ganji : {place} ne peut pas vous recevoir à la date demandée. Ouvrez Ganji pour voir la réponse et choisir une autre date.",
+      "en": "Ganji: {place} cannot see you on the requested date. Open Ganji to read the reply and choose another date.",
+      "vars": [
+        "place"
+      ]
+    },
+    "rdv.refused.other": {
+      "module": "appointments",
+      "fr": "Ganji : {place} ne peut pas recevoir {prenom} à la date demandée. Ouvrez Ganji pour voir la réponse.",
+      "en": "Ganji: {place} cannot see {prenom} on the requested date. Open Ganji to read the reply.",
+      "vars": [
+        "place",
+        "prenom"
+      ]
+    },
+    "rdv.service.CARDIOLOGIE": {
+      "module": "appointments",
+      "fr": "cardiologie",
+      "en": "cardiology",
+      "vars": []
+    },
+    "rdv.service.DERMATOLOGIE": {
+      "module": "appointments",
+      "fr": "dermatologie",
+      "en": "dermatology",
+      "vars": []
+    },
+    "rdv.service.GENERALE": {
+      "module": "appointments",
+      "fr": "consultation",
+      "en": "consultation",
+      "vars": []
+    },
+    "rdv.service.GYNECOLOGIE": {
+      "module": "appointments",
+      "fr": "santé de la femme",
+      "en": "women's health",
+      "vars": []
+    },
+    "rdv.service.HEMATOLOGIE": {
+      "module": "appointments",
+      "fr": "hématologie",
+      "en": "haematology",
+      "vars": []
+    },
+    "rdv.service.ONCOLOGIE": {
+      "module": "appointments",
+      "fr": "oncologie",
+      "en": "oncology",
+      "vars": []
+    },
+    "rdv.service.PEDIATRIE": {
+      "module": "appointments",
+      "fr": "pédiatrie",
+      "en": "paediatrics",
+      "vars": []
+    },
+    "rights.n.coverage.body": {
+      "module": "rights",
+      "fr": "{scheme} : {rate} % de vos soins pris en charge.",
+      "en": "{scheme}: {rate}% of your care covered.",
+      "vars": [
+        "rate",
+        "scheme"
+      ]
+    },
+    "rights.n.coverage.title": {
+      "module": "rights",
+      "fr": "Couverture vérifiée",
+      "en": "Coverage verified",
+      "vars": []
+    },
+    "rights.n.payment.body": {
+      "module": "rights",
+      "fr": "{amount} FCFA · {label} · reçu {receipt}",
+      "en": "{amount} FCFA · {label} · receipt {receipt}",
+      "vars": [
+        "amount",
+        "label",
+        "receipt"
+      ]
+    },
+    "rights.n.payment.title": {
+      "module": "rights",
+      "fr": "Paiement reçu",
+      "en": "Payment received",
+      "vars": []
+    },
+    "rights.payment": {
+      "module": "rights",
+      "fr": "Ganji : paiement de {amount} FCFA reçu. Reçu n° {receipt}. Détails dans l’application.",
+      "en": "Ganji: payment of {amount} FCFA received. Receipt no. {receipt}. Details in the app.",
+      "vars": [
+        "amount",
+        "receipt"
+      ]
+    },
+    "sms.rdv.next": {
+      "module": "channels",
+      "fr": "Ganji : prochain rendez-vous {when}.",
+      "en": "Ganji: next appointment {when}.",
+      "vars": [
+        "when"
+      ]
+    },
+    "sms.rdv.nextAt": {
+      "module": "channels",
+      "fr": "Ganji : prochain rendez-vous {when} à {place}.",
+      "en": "Ganji: next appointment {when} at {place}.",
+      "vars": [
+        "place",
+        "when"
+      ]
+    },
+    "sms.rdv.none": {
+      "module": "channels",
+      "fr": "Ganji : aucun rendez-vous prévu.",
+      "en": "Ganji: no appointment planned.",
+      "vars": []
+    },
+    "sms.rdv.noRecord": {
+      "module": "channels",
+      "fr": "Ganji : aucun carnet lié à ce numéro.",
+      "en": "Ganji: no health record is linked to this number.",
+      "vars": []
+    },
+    "sms.reply.confirmed": {
+      "module": "channels",
+      "fr": "Ganji : merci, votre confirmation est bien enregistrée.",
+      "en": "Ganji: thank you, your confirmation has been recorded.",
+      "vars": []
+    },
+    "sms.reply.don": {
+      "module": "channels",
+      "fr": "Ganji : merci ! Vous êtes de nouveau disponible pour les appels au don.",
+      "en": "Ganji: thank you! You are available for blood donation calls again.",
+      "vars": []
+    },
+    "sms.reply.help": {
+      "module": "channels",
+      "fr": "Ganji : commandes possibles : 1 (oui), 2 (non), RDV, DON, STOP. Pour une urgence, appelez le 118.",
+      "en": "Ganji: possible commands: 1 (yes), 2 (no), RDV, DON, STOP. In an emergency, call 118.",
+      "vars": []
+    },
+    "sms.reply.nothing": {
+      "module": "channels",
+      "fr": "Ganji : aucune demande en attente pour ce numéro. Tapez RDV pour votre prochain rendez-vous.",
+      "en": "Ganji: nothing is pending for this number. Send RDV for your next appointment.",
+      "vars": []
+    },
+    "sms.reply.stop": {
+      "module": "channels",
+      "fr": "Ganji : vous ne recevrez plus d’appels au don. Envoyez DON pour vous réinscrire.",
+      "en": "Ganji: you will no longer receive blood donation calls. Send DON to sign up again.",
+      "vars": []
+    },
+    "ussd.don.ask": {
+      "module": "channels",
+      "fr": "Don de sang à {place}\n1. Oui, je viens\n2. Non, pas cette fois",
+      "en": "Blood donation at {place}\n1. Yes, I am coming\n2. No, not this time",
+      "vars": [
+        "place"
+      ]
+    },
+    "ussd.don.none": {
+      "module": "channels",
+      "fr": "Aucun appel au don en attente.",
+      "en": "No blood donation call pending.",
+      "vars": []
+    },
+    "ussd.don.thanks": {
+      "module": "channels",
+      "fr": "Merci pour votre réponse.",
+      "en": "Thank you for your answer.",
+      "vars": []
+    },
+    "ussd.don.thanksRdv": {
+      "module": "channels",
+      "fr": "Merci ! RDV {when}.",
+      "en": "Thank you! Appointment {when}.",
+      "vars": [
+        "when"
+      ]
+    },
+    "ussd.emergency": {
+      "module": "channels",
+      "fr": "Urgence : appelez le 118 (pompiers). Allez à l’hôpital le plus proche. Montrez votre carte QR Ganji.",
+      "en": "Emergency: call 118 (fire brigade). Go to the nearest hospital. Show your Ganji QR card.",
+      "vars": []
+    },
+    "ussd.menu": {
+      "module": "channels",
+      "fr": "Ganji\n1. Mon prochain RDV\n2. Répondre à un appel au don\n3. Pharmacie de garde\n4. Urgence",
+      "en": "Ganji\n1. My next appointment\n2. Answer a blood donation call\n3. Pharmacy on duty\n4. Emergency",
+      "vars": []
+    },
+    "ussd.pharmacies": {
+      "module": "channels",
+      "fr": "Pharmacies de garde :\n{list}",
+      "en": "Pharmacies on duty:\n{list}",
+      "vars": [
+        "list"
+      ]
+    },
+    "voice.message": {
+      "module": "channels",
+      "fr": "Message vocal ({lang}) : {text}",
+      "en": "Voice message ({lang}): {text}",
+      "vars": [
+        "lang",
+        "text"
+      ]
+    }
+  }
+}

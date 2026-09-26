@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
+import { sms } from '../common/i18n';
 import { PrismaService } from '../prisma/prisma.service';
 import { BreakGlassDto, SosDto } from './emergency.dto';
 import { Origin, Recipient, RespondersService } from './responders.service';
@@ -69,11 +70,7 @@ export class EmergencyService {
     });
     const holder = holderContact(patient);
     if (!recentNotice && holder) {
-      await this.responders.notify(
-        [holder],
-        "Ganji : votre carte d'urgence vient d'être consultée. Si ce n'est pas normal, contactez-nous.",
-        ref,
-      );
+      await this.responders.notify([holder], (lang) => sms('emergency.cardRead', lang), ref);
     }
 
     return {
@@ -119,17 +116,13 @@ export class EmergencyService {
 
     const holder = holderContact(patient);
     const family = [...(holder ? [holder] : []), ...(await this.responders.caregivers(patient.id))];
-    await this.responders.notify(
-      family,
-      `Ganji : un soignant (${user.name}) a ouvert votre dossier en urgence. Motif enregistré. Vous pouvez le voir dans votre journal d'accès.`,
-      `break-glass:${consent.id}`,
-    );
+    await this.responders.notify(family, (lang) => sms('emergency.breakGlass', lang, { name: user.name }), `break-glass:${consent.id}`);
 
     // Contrôle a posteriori : chaque bris de glace est signalé aux administrateurs.
     const controllers = await this.prisma.user.findMany({ where: { role: 'ADMIN' }, select: { id: true, phone: true, lang: true } });
     await this.responders.notify(
       controllers.map((c) => (c.phone ? { to: c.phone, lang: c.lang } : { to: c.id, lang: c.lang, channel: 'PUSH' as const })),
-      `Contrôle : accès bris de glace par ${user.name}`,
+      (lang) => sms('emergency.breakGlass.control', lang, { name: user.name }),
       `break-glass:${consent.id}`,
     );
 
@@ -145,12 +138,13 @@ export class EmergencyService {
     });
 
     const position: Origin | null = dto.lat !== undefined && dto.lng !== undefined ? { lat: dto.lat, lng: dto.lng } : null;
-    let body = `Ganji SOS : ${patient.firstName} a besoin d'aide.`;
+    let url: string | null = null;
     if (position) {
       const lat = position.lat.toFixed(5);
       const lng = position.lng.toFixed(5);
-      body += ` Position : https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
+      url = `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=17/${lat}/${lng}`;
     }
+    const body = (lang: Recipient['lang']) => (url ? sms('emergency.sos.position', lang, { prenom: patient.firstName, url }) : sms('emergency.sos', lang, { prenom: patient.firstName }));
 
     const recipients: Recipient[] = [
       ...(patient.emergencyPhone ? [{ to: patient.emergencyPhone, lang: 'fr' as const }] : []),

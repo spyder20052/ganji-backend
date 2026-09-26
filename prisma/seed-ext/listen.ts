@@ -1,5 +1,5 @@
 import { CryptoService } from '../../src/common/crypto.service';
-import { sms } from '../../src/common/sms';
+import { sms } from '../../src/common/i18n';
 import { LISTEN_SYSTEM } from '../../src/listen/listen.service';
 import type { SeedCtx } from './context';
 

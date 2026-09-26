@@ -6,7 +6,7 @@ import { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { distanceKm } from '../common/geo';
 import { NotificationsService } from '../common/notifications.service';
-import { defineSms, sms } from '../common/sms';
+import { note, plural, sms, type TextKey, type Vars } from '../common/i18n';
 import { TickRegistry } from '../common/tick.registry';
 import { prescriptionSignedString, type PrescriptionItem } from '../medications/medications.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -65,112 +65,25 @@ type OrderRef = Pick<Order, 'id' | 'patientId' | 'userId'>;
 /** Volets de délégation qui permettent de commander pour la personne et de suivre ses commandes. */
 export const ORDER_SCOPES = ['orders', 'prescriptions', 'all'];
 
-// SMS : jamais le nom d'un médicament, seulement « votre commande », une référence, un code.
-defineSms({
-  'order.received': {
-    fr: 'Ganji : commande {ref} envoyée à {pharmacy}. Code de remise : {code}. Donnez-le seulement quand vous recevez la commande.',
-    en: 'Ganji: order {ref} sent to {pharmacy}. Handover code: {code}. Give it only when you receive the order.',
-  },
-  'order.paid': {
-    fr: 'Payé : {amount} FCFA ({provider}, reçu {receipt}).',
-    en: 'Paid: {amount} FCFA ({provider}, receipt {receipt}).',
-  },
-  'order.accepted': {
-    fr: 'Ganji : {pharmacy} a accepté votre commande {ref}. Elle est en préparation.',
-    en: 'Ganji: {pharmacy} accepted your order {ref}. It is being prepared.',
-  },
-  'order.ready.delivery': {
-    fr: 'Ganji : votre commande {ref} est prête. Le livreur part bientôt.',
-    en: 'Ganji: your order {ref} is ready. The courier leaves soon.',
-  },
-  'order.ready.pickup': {
-    fr: 'Ganji : votre commande {ref} est prête chez {pharmacy}. Venez avec le code {code}.',
-    en: 'Ganji: your order {ref} is ready at {pharmacy}. Come with the code {code}.',
-  },
-  'order.dispatched': {
-    fr: 'Ganji : votre commande {ref} est en route. Livreur : {courier}, {courierPhone}. Donnez-lui le code {code} à la remise.',
-    en: 'Ganji: your order {ref} is on its way. Courier: {courier}, {courierPhone}. Give the code {code} on delivery.',
-  },
-  'order.cash': {
-    fr: 'Prévoyez {amount} FCFA en espèces.',
-    en: 'Have {amount} FCFA in cash ready.',
-  },
-  'order.delivered': {
-    fr: 'Ganji : commande {ref} remise. Reçu {receipt}. Merci !',
-    en: 'Ganji: order {ref} handed over. Receipt {receipt}. Thank you!',
-  },
-  'order.refused': {
-    fr: 'Ganji : {pharmacy} ne peut pas servir votre commande {ref}. Ouvrez Ganji pour voir pourquoi et commander ailleurs.',
-    en: 'Ganji: {pharmacy} cannot fill your order {ref}. Open Ganji to see why and order elsewhere.',
-  },
-  'order.cancelled': {
-    fr: 'Ganji : commande {ref} annulée.',
-    en: 'Ganji: order {ref} cancelled.',
-  },
-  'order.expired': {
-    fr: 'Ganji : {pharmacy} n’a pas répondu, commande {ref} annulée. Ouvrez Ganji pour commander ailleurs.',
-    en: 'Ganji: {pharmacy} did not answer, order {ref} cancelled. Open Ganji to order elsewhere.',
-  },
-  'order.refunded': {
-    fr: '{amount} FCFA remboursés sur votre compte mobile money.',
-    en: '{amount} FCFA refunded to your mobile money account.',
-  },
-  'order.received.family': {
-    fr: 'Ganji : commande {ref} envoyée à {pharmacy}.',
-    en: 'Ganji: order {ref} sent to {pharmacy}.',
-  },
-  'order.ready.pickup.family': {
-    fr: 'Ganji : la commande {ref} est prête chez {pharmacy}.',
-    en: 'Ganji: order {ref} is ready at {pharmacy}.',
-  },
-  'order.dispatched.family': {
-    fr: 'Ganji : la commande {ref} est en route. Livreur : {courier}, {courierPhone}.',
-    en: 'Ganji: order {ref} is on its way. Courier: {courier}, {courierPhone}.',
-  },
-  'order.failed': {
-    fr: 'Ganji : la commande {ref} n’a pas pu être remise. Ouvrez Ganji pour voir pourquoi et commander à nouveau.',
-    en: 'Ganji: order {ref} could not be handed over. Open Ganji to see why and order again.',
-  },
-  'order.newcode': {
-    fr: 'Ganji : nouveau code de remise pour la commande {ref} : {code}. L’ancien ne marche plus.',
-    en: 'Ganji: new handover code for order {ref}: {code}. The old one no longer works.',
-  },
-  'order.pharmacy.reminder': {
-    fr: 'Ganji : la commande {ref} attend votre réponse depuis plus de 30 min. Ouvrez l’espace pharmacie.',
-    en: 'Ganji: order {ref} has been waiting for your answer for over 30 min. Open the pharmacy space.',
-  },
-});
-
 /**
- * Notifications dans l'application (cloche), dans la langue de la personne : [titre, texte, texte sans code].
- * Le code de remise ne va qu'au patient (ou à son parent) et à l'auteur de la commande ; les autres aidants
- * reçoivent le texte sans code, ou rien (codeOnly).
+ * Notifications de la famille dans l'application (cloche), dans la langue de chacun : titre, texte, texte sans
+ * code (clés order.n.*). Le code de remise ne va qu'au patient (ou à son parent) et à l'auteur de la commande ;
+ * les autres aidants reçoivent le texte sans code, ou rien (codeOnly).
  */
-type AppText = [string, string, string?];
-const APP: Record<string, { fr: AppText; en: AppText; codeOnly?: boolean }> = {
-  received: {
-    fr: ['Commande envoyée', '{pharmacy} a reçu votre commande {ref}. Code de remise : {code}.', '{pharmacy} a reçu la commande {ref}.'],
-    en: ['Order sent', '{pharmacy} received your order {ref}. Handover code: {code}.', '{pharmacy} received order {ref}.'],
-  },
-  accepted: { fr: ['Commande acceptée', '{pharmacy} prépare votre commande {ref}.'], en: ['Order accepted', '{pharmacy} is preparing your order {ref}.'] },
-  readyDelivery: { fr: ['Commande prête', 'Votre commande {ref} part bientôt.'], en: ['Order ready', 'Your order {ref} leaves soon.'] },
-  readyPickup: {
-    fr: ['Commande prête', 'Votre commande {ref} vous attend chez {pharmacy}. Code : {code}.', 'La commande {ref} attend chez {pharmacy}.'],
-    en: ['Order ready', 'Your order {ref} is waiting at {pharmacy}. Code: {code}.', 'Order {ref} is waiting at {pharmacy}.'],
-  },
-  dispatched: {
-    fr: ['Commande en route', 'Livreur : {courier}, {courierPhone}. Code à donner : {code}.', 'Livreur : {courier}, {courierPhone}.'],
-    en: ['Order on its way', 'Courier: {courier}, {courierPhone}. Code to give: {code}.', 'Courier: {courier}, {courierPhone}.'],
-  },
-  newCode: { fr: ['Nouveau code de remise', 'Commande {ref} : votre nouveau code est {code}.'], en: ['New handover code', 'Order {ref}: your new code is {code}.'], codeOnly: true },
-  delivered: { fr: ['Commande remise', 'Commande {ref} remise. Reçu {receipt}.'], en: ['Order handed over', 'Order {ref} handed over. Receipt {receipt}.'] },
-  refused: { fr: ['Commande refusée', '{pharmacy} : {reason}.'], en: ['Order declined', '{pharmacy}: {reason}.'] },
-  failed: { fr: ['Commande non remise', '{pharmacy} : {reason}. Vous pouvez commander à nouveau.'], en: ['Order not handed over', '{pharmacy}: {reason}. You can order again.'] },
-  cancelled: { fr: ['Commande annulée', 'Commande {ref} annulée.'], en: ['Order cancelled', 'Order {ref} cancelled.'] },
-  expired: { fr: ['Commande annulée', '{pharmacy} n’a pas répondu à temps.'], en: ['Order cancelled', '{pharmacy} did not answer in time.'] },
+const APP: Record<string, { title: TextKey; body: TextKey; noCode?: TextKey; codeOnly?: boolean }> = {
+  received: { title: 'order.n.received.title', body: 'order.n.received.body', noCode: 'order.n.received.noCode' },
+  accepted: { title: 'order.n.accepted.title', body: 'order.n.accepted.body' },
+  readyDelivery: { title: 'order.n.readyDelivery.title', body: 'order.n.readyDelivery.body' },
+  readyPickup: { title: 'order.n.readyPickup.title', body: 'order.n.readyPickup.body', noCode: 'order.n.readyPickup.noCode' },
+  dispatched: { title: 'order.n.dispatched.title', body: 'order.n.dispatched.body', noCode: 'order.n.dispatched.noCode' },
+  newCode: { title: 'order.n.newCode.title', body: 'order.n.newCode.body', codeOnly: true },
+  delivered: { title: 'order.n.delivered.title', body: 'order.n.delivered.body' },
+  refused: { title: 'order.n.refused.title', body: 'order.n.refused.body' },
+  failed: { title: 'order.n.failed.title', body: 'order.n.failed.body' },
+  cancelled: { title: 'order.n.cancelled.title', body: 'order.n.cancelled.body' },
+  expired: { title: 'order.n.expired.title', body: 'order.n.expired.body' },
 };
 
-const fill = (s: string, vars: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 const shortName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName.charAt(0)}.`;
 const nf = (n: number) => n.toLocaleString('fr-FR').replace(/ | /g, ' ');
 const now = () => new Date();
@@ -369,8 +282,13 @@ export class OrdersService implements OnModuleInit {
     const staff = await this.notifications.usersWithRole('PHARMACIST', pharmacy.id);
     await this.notifications.notify(staff, {
       kind: 'COMMANDE',
-      title: `Nouvelle commande ${ref}`,
-      body: `${shortName(patient)} · ${items.length} médicament${items.length > 1 ? 's' : ''} · ${dto.mode === 'LIVRAISON' ? 'livraison' : 'retrait'} · ${nf(total)} FCFA${payment ? ' (payée)' : ''}`,
+      text: note('order.n.staff.new.title', payment ? 'order.n.staff.new.bodyPaid' : 'order.n.staff.new.body', {
+        ref,
+        patient: shortName(patient),
+        items: (l) => plural('order.items', items.length, l),
+        mode: (l) => sms(dto.mode === 'LIVRAISON' ? 'order.mode.LIVRAISON' : 'order.mode.RETRAIT', l),
+        total: nf(total),
+      }),
       href: '/pharmacie#commandes',
       ref: `order:${id}`,
     });
@@ -409,7 +327,7 @@ export class OrdersService implements OnModuleInit {
     const vars = { ref: orderRef(o.id), pharmacy: o.pharmacyName, amount: nf(o.totalFcfa) };
     await this.notifyFamily(o, 'cancelled', vars, (lang) => [sms('order.cancelled', lang, vars), refunded ? sms('order.refunded', lang, vars) : null].filter(Boolean).join(' '));
     const staff = await this.notifications.usersWithRole('PHARMACIST', o.pharmacyId);
-    await this.notifications.notify(staff, { kind: 'COMMANDE', title: `Commande ${vars.ref} annulée`, body: 'Annulée par le patient avant votre réponse.', href: '/pharmacie#commandes', ref: `order:${o.id}` });
+    await this.notifications.notify(staff, { kind: 'COMMANDE', text: note('order.n.staff.cancelled.title', 'order.n.staff.cancelled.body', vars), href: '/pharmacie#commandes', ref: `order:${o.id}` });
     return this.getMine(user, id);
   }
 
@@ -656,7 +574,7 @@ export class OrdersService implements OnModuleInit {
         const vars = { ref, pharmacy: o.pharmacyName, amount: nf(o.totalFcfa) };
         await this.notifyFamily(o, 'expired', vars, (lang) => [sms('order.expired', lang, vars), refunded ? sms('order.refunded', lang, vars) : null].filter(Boolean).join(' '));
         const staff = await this.notifications.usersWithRole('PHARMACIST', o.pharmacyId);
-        await this.notifications.notify(staff, { kind: 'COMMANDE', title: `Commande ${ref} annulée`, body: 'Sans réponse de votre part : le patient a été prévenu.', href: '/pharmacie#commandes', ref: `order:${o.id}` });
+        await this.notifications.notify(staff, { kind: 'COMMANDE', text: note('order.n.staff.expired.title', 'order.n.staff.expired.body', { ref }), href: '/pharmacie#commandes', ref: `order:${o.id}` });
         expired++;
         continue;
       }
@@ -669,8 +587,7 @@ export class OrdersService implements OnModuleInit {
       const staff = await this.notifications.usersWithRole('PHARMACIST', o.pharmacyId);
       await this.notifications.notify(staff, {
         kind: 'COMMANDE',
-        title: `Commande ${ref} en attente`,
-        body: 'Un patient attend votre réponse depuis plus de 30 min.',
+        text: note('order.n.staff.waiting.title', 'order.n.staff.waiting.body', { ref }),
         href: '/pharmacie#commandes',
         sms: (lang) => sms('order.pharmacy.reminder', lang, { ref }),
         ref: `order:${o.id}`,
@@ -684,16 +601,17 @@ export class OrdersService implements OnModuleInit {
       take: 200,
     });
     for (const o of stuck) {
-      const reason = 'Commande non remise dans les délais';
+      // Motif enregistré en français (historique de la commande) ; la famille le lit dans sa langue.
+      const reason = sms('order.reason.late', 'fr');
       let refunded: boolean;
       try {
         refunded = await this.closeAsFailed(o, 'Ganji (non remise)', reason);
       } catch {
         continue;
       }
-      await this.notifyFailed(o, reason, refunded);
+      await this.notifyFailed(o, (lang) => sms('order.reason.late', lang), refunded);
       const staff = await this.notifications.usersWithRole('PHARMACIST', o.pharmacyId);
-      await this.notifications.notify(staff, { kind: 'COMMANDE', title: `Commande ${orderRef(o.id)} clôturée`, body: 'Non remise dans les délais : stock rendu, patient prévenu.', href: '/pharmacie#commandes', ref: `order:${o.id}` });
+      await this.notifications.notify(staff, { kind: 'COMMANDE', text: note('order.n.staff.closed.title', 'order.n.staff.closed.body', { ref: orderRef(o.id) }), href: '/pharmacie#commandes', ref: `order:${o.id}` });
       failed++;
     }
     return { reminded, expired, failed };
@@ -769,8 +687,10 @@ export class OrdersService implements OnModuleInit {
     return refunded;
   }
 
-  private async notifyFailed(order: Order, reason: string, refunded: boolean) {
-    const vars = { ref: orderRef(order.id), pharmacy: order.pharmacyName, amount: nf(order.totalFcfa), reason: reason.replace(/[.\s]+$/, '') };
+  /** Motif écrit par la pharmacie (tel quel), ou motif de Ganji dans la langue de chacun. */
+  private async notifyFailed(order: Order, reason: string | ((lang: Lang) => string), refunded: boolean) {
+    const clean = (r: string) => r.replace(/[.\s]+$/, '');
+    const vars: Vars = { ref: orderRef(order.id), pharmacy: order.pharmacyName, amount: nf(order.totalFcfa), reason: typeof reason === 'string' ? clean(reason) : (l) => clean(reason(l)) };
     await this.notifyFamily(order, 'failed', vars, (lang) => [sms('order.failed', lang, vars), refunded ? sms('order.refunded', lang, vars) : null].filter(Boolean).join(' '));
   }
 
@@ -903,7 +823,7 @@ export class OrdersService implements OnModuleInit {
    * l'auteur de la commande s'il a toujours accès ; les autres aidants (volet « commandes ») reçoivent un
    * texte sans code, ou rien pour un nouveau code.
    */
-  private async notifyFamily(order: OrderRef, key: keyof typeof APP, vars: Record<string, string | number>, smsText: (lang: Lang, withCode: boolean) => string | null) {
+  private async notifyFamily(order: OrderRef, key: keyof typeof APP, vars: Vars, smsText: (lang: Lang, withCode: boolean) => string | null) {
     const p = await this.prisma.patient.findUnique({
       where: { id: order.patientId },
       select: { userId: true, parent: { select: { userId: true } }, delegations: { where: { revokedAt: null, scopes: { hasSome: ORDER_SCOPES } }, select: { caregiverId: true } } },
@@ -915,24 +835,15 @@ export class OrdersService implements OnModuleInit {
     const holders = new Set(split.holders);
     const others = split.others;
     const entry = APP[key];
-    const users = await this.prisma.user.findMany({ where: { id: { in: [...holders, ...others] } }, select: { id: true, lang: true } });
-    const groups = new Map<string, { ids: string[]; lang: 'fr' | 'en'; withCode: boolean }>();
-    for (const u of users) {
-      const withCode = holders.has(u.id);
-      if (!withCode && entry.codeOnly) continue;
-      const lang = u.lang === 'en' ? 'en' : 'fr';
-      const k = `${lang}|${withCode}`;
-      groups.set(k, { ids: [...(groups.get(k)?.ids ?? []), u.id], lang, withCode });
-    }
-    for (const g of groups.values()) {
-      const [title, body, bodyNoCode] = entry[g.lang];
-      const text = (lang: Lang) => smsText(lang, g.withCode);
-      await this.notifications.notify(g.ids, {
+    // Deux envois au plus : avec le code (titulaires) et sans (autres aidants) ; chacun dans sa langue.
+    for (const withCode of [true, false]) {
+      const ids = withCode ? [...holders] : entry.codeOnly ? [] : others;
+      if (!ids.length) continue;
+      await this.notifications.notify(ids, {
         kind: 'COMMANDE',
-        title: fill(title, vars),
-        body: fill(g.withCode ? body : (bodyNoCode ?? body), vars),
+        text: note(entry.title, withCode ? entry.body : (entry.noCode ?? entry.body), vars),
         href: `/app/commandes/${order.id}`,
-        ...(text(g.lang) !== null ? { sms: (lang: Lang) => text(lang) ?? '' } : {}),
+        ...(smsText('fr', withCode) !== null ? { sms: (lang: Lang) => smsText(lang, withCode) ?? '' } : {}),
         ref: `order:${order.id}`,
       });
     }

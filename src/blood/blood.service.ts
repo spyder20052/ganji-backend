@@ -7,7 +7,7 @@ import { CryptoService } from '../common/crypto.service';
 import { compatibleDonorGroups, distanceKm } from '../common/geo';
 import { NotificationsService } from '../common/notifications.service';
 import { OutboxService } from '../common/outbox.service';
-import { sms } from '../common/sms';
+import { note, plural, sms, text, type Var, type Vars } from '../common/i18n';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBloodRequestDto, DonorProfileDto } from './blood.dto';
 import { dayIn, PRODUCT_LABEL, productIn, urgencyIn, whenIn } from './blood.sms';
@@ -157,11 +157,19 @@ export class BloodService {
     const place = placeOf(facility);
     return this.notifications.notify(ids, {
       kind: 'SANG',
-      title: `Demande de sang ${r.bloodGroup} · ${place}`,
-      body: `${r.quantity} poche${r.quantity > 1 ? 's' : ''} de ${PRODUCT_LABEL[r.product]} ${r.bloodGroup}, ${urgencyIn(r.urgency)}, avant ${whenIn(r.neededBy)}. Demandée par ${r.requester}.`,
+      text: (lang) => ({
+        title: text('blood.n.ants.title', lang, { group: r.bloodGroup, place }),
+        body: plural('blood.n.ants.body', r.quantity, lang, {
+          product: (l) => productIn(r.product, l),
+          group: r.bloodGroup,
+          urgency: (l) => urgencyIn(r.urgency, l),
+          when: (l) => whenIn(r.neededBy, l),
+          requester: r.requester,
+        }),
+      }),
       href: `/ants#demande-${requestId}`,
       ref: `blood-request:${requestId}`,
-      sms: (lang) => sms('blood.ants.request', lang, { qty: r.quantity, product: productIn(r.product, lang), group: r.bloodGroup, place, urgency: urgencyIn(r.urgency, lang) }),
+      sms: (lang) => sms('blood.ants.request', lang, { qty: r.quantity, product: (l) => productIn(r.product, l), group: r.bloodGroup, place, urgency: (l) => urgencyIn(r.urgency, l) }),
     });
   }
 
@@ -203,7 +211,7 @@ export class BloodService {
       const channel = donorChannel(d);
       byChannel[channel]++;
       const alert = await this.prisma.donorAlert.create({ data: { requestId: req.id, donorId: d.id, distanceKm: km, channel } });
-      const group = req.bloodGroup === d.bloodGroup ? d.bloodGroup : `${d.bloodGroup}, compatible`;
+      const group: Var = req.bloodGroup === d.bloodGroup ? d.bloodGroup : (l) => sms('blood.group.compatible', l, { group: d.bloodGroup });
       await this.outbox.send({
         channel: 'SMS',
         to: d.phone,
@@ -218,8 +226,7 @@ export class BloodService {
       if (d.userId) {
         await this.notifications.notify(d.userId, {
           kind: 'SANG',
-          title: 'Votre sang peut sauver une vie',
-          body: `${place}, à ${Math.round(km)} km : un patient a besoin de votre groupe (${d.bloodGroup}). Répondez oui ou non.`,
+          text: note('blood.n.call.title', 'blood.n.call.body', { place, km: Math.round(km), group: d.bloodGroup }),
           href: '/app/sang',
         });
       }
@@ -296,31 +303,34 @@ export class BloodService {
       lang: donor.lang,
       audioKey: 'donor.thanks',
       ref: `blood-request:${req.id}`,
-      body: sms('blood.donor.rdv', donor.lang, { name: donor.firstName, when: whenIn(appointment, donor.lang), place }),
+      body: sms('blood.donor.rdv', donor.lang, { name: donor.firstName, when: (l) => whenIn(appointment, l), place }),
     });
     if (donor.userId) {
       await this.notifications.notify(donor.userId, {
         kind: 'SANG',
-        title: 'Merci ! Votre rendez-vous de don',
-        body: `${whenIn(appointment)} à ${place}, service de transfusion. Venez après avoir mangé, avec une pièce d’identité.`,
+        text: note('blood.n.rdv.title', 'blood.n.rdv.body', { when: (l) => whenIn(appointment, l), place }),
         href: '/app/sang',
       });
     }
 
-    const how = volunteer ? 's’est proposé' : via === 'APP' ? 'a dit oui dans l’application' : via === 'SMS' ? 'a répondu 1 par SMS' : 'a répondu par USSD';
-    const summary = `${donor.firstName} (${donor.bloodGroup}, ${Math.round(km)} km) ${how}. Rendez-vous ${whenIn(appointment)} à ${place}.`;
+    // Qui a dit oui, et comment : texte du soignant, repris pour la banque de sang.
+    const summaryKey = volunteer ? 'blood.n.found.volunteer' : (`blood.n.found.${via}` as const);
+    const summaryVars: Vars = { donor: donor.firstName, group: donor.bloodGroup, km: Math.round(km), when: (l) => whenIn(appointment, l), place };
     await this.notifications.notify(req.requesterId, {
       kind: 'SANG',
-      title: `Donneur trouvé pour ${req.patient.firstName}`,
-      body: summary,
+      text: note('blood.n.found.title', summaryKey, { ...summaryVars, prenom: req.patient.firstName }),
       href: `/pro/sang/${req.id}`,
       ref: `blood-request:${req.id}`,
-      sms: (lang) => sms('blood.requester.donor', lang, { group: donor.bloodGroup, place, when: whenIn(appointment, lang) }),
+      sms: (lang) => sms('blood.requester.donor', lang, { group: donor.bloodGroup, place, when: (l) => whenIn(appointment, l) }),
     });
     await this.notifications.notify(await this.notifications.usersWithRole('BLOOD_BANK'), {
       kind: 'SANG',
-      title: `Donneur à recevoir · ${place}`,
-      body: `${summary} Demande ${req.bloodGroup}, ${PRODUCT_LABEL[req.product]}.`,
+      text: note('blood.n.toReceive.title', 'blood.n.toReceive.body', {
+        place,
+        summary: (l) => sms(summaryKey, l, summaryVars),
+        group: req.bloodGroup,
+        product: (l) => productIn(req.product, l),
+      }),
       href: `/ants#demande-${req.id}`,
     });
 
@@ -344,8 +354,9 @@ export class BloodService {
       if (f.caregiver.id === skipUserId) continue;
       await this.notifications.notify(f.caregiver.id, {
         kind: 'SANG',
-        title: discreet ? 'Nouveau message' : `Bonne nouvelle pour ${req.patient.firstName}`,
-        body: discreet ? 'Ouvrez la page Sang.' : 'Un donneur a dit oui. Détails dans la page Sang.',
+        text: discreet
+          ? note('blood.n.family.discreet.title', 'blood.n.family.discreet.body')
+          : note('blood.n.family.title', 'blood.n.family.body', { prenom: req.patient.firstName }),
         href: '/app/sang',
       });
       if (!f.caregiver.phone) continue;
@@ -641,8 +652,14 @@ export class BloodService {
     const siteName = placeOf(site);
     await this.notifications.notify(req.requesterId, {
       kind: 'SANG',
-      title: `${units} poche${units > 1 ? 's' : ''} réservée${units > 1 ? 's' : ''} pour ${req.patient.firstName}`,
-      body: `${siteName} a mis de côté ${draw.map((d) => `${d.units} ${d.bloodGroup}`).join(', ')} (${PRODUCT_LABEL[req.product]}).${complete ? ' Le besoin est couvert.' : ''}`,
+      text: (lang) => ({
+        title: plural('blood.n.reserved.title', units, lang, { prenom: req.patient.firstName }),
+        body: text(complete ? 'blood.n.reserved.bodyCovered' : 'blood.n.reserved.body', lang, {
+          site: siteName,
+          units: draw.map((d) => `${d.units} ${d.bloodGroup}`).join(', '),
+          product: (l) => productIn(req.product, l),
+        }),
+      }),
       href: `/pro/sang/${req.id}`,
       ref: `blood-request:${req.id}`,
       sms: (lang) => sms('blood.requester.reserved', lang, { site: siteName, n: units, place }),
@@ -798,9 +815,9 @@ export class BloodService {
     for (const a of givers) {
       const d = a.donor;
       const next = nextDonationDate(now, d.sex)!;
-      await this.outbox.send({ channel: 'SMS', to: d.phone, lang: d.lang, audioKey: 'donor.thanks', ref: `blood-request:${r.id}`, body: sms('blood.donor.gave', d.lang, { name: d.firstName, date: dayIn(next, d.lang) }) });
+      await this.outbox.send({ channel: 'SMS', to: d.phone, lang: d.lang, audioKey: 'donor.thanks', ref: `blood-request:${r.id}`, body: sms('blood.donor.gave', d.lang, { name: d.firstName, date: (l) => dayIn(next, l) }) });
       if (d.userId) {
-        await this.notifications.notify(d.userId, { kind: 'SANG', title: 'Merci pour votre don !', body: `Vous avez peut-être sauvé une vie. Prochain don possible à partir du ${dayIn(next)}.`, href: '/app/sang' });
+        await this.notifications.notify(d.userId, { kind: 'SANG', text: note('blood.n.thanks.title', 'blood.n.thanks.body', { date: (l) => dayIn(next, l) }), href: '/app/sang' });
       }
     }
     // Les donneurs encore en attente n'ont plus à venir.

@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import type { Lang } from '@prisma/client';
 import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/auth-user';
+import { label, sms } from '../common/i18n';
 import { OutboxService } from '../common/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlertDto, ReportDto } from './alerts.dto';
@@ -82,7 +84,8 @@ export class AlertsService {
       take: 50,
     });
     for (const r of recipients) {
-      await this.outbox.send({ channel: 'SMS', to: r.phone!, lang: r.lang, body: `Ganji · ${dto.title} : ${dto.message}`.slice(0, 300), ref: `alert:${alert.id}` });
+      // Titre et message tels que rédigés par le ministère : seul l'habillage suit la langue de la personne.
+      await this.outbox.send({ channel: 'SMS', to: r.phone!, lang: r.lang, body: sms('alerts.broadcast', r.lang, { title: dto.title, message: dto.message }).slice(0, 300), ref: `alert:${alert.id}` });
     }
     await this.audit.log({ actor: user, action: 'ALERT', resource: `Alerte « ${dto.title} » (${communes.length || 'national'})` });
     return { id: alert.id, broadcast: recipients.length };
@@ -147,7 +150,10 @@ export class AlertsService {
     for (const g of groups) {
       if (g._count._all < CLUSTER_MIN_REPORTS && !IMMEDIATE.has(g.syndrome)) continue;
       const commune = await this.prisma.commune.findUniqueOrThrow({ where: { id: g.communeId } });
-      const title = `Regroupement de cas : ${SYNDROMES[g.syndrome].toLowerCase()} à ${commune.name}`;
+      const titleIn = (lang: Lang) =>
+        sms('alerts.cluster.title', lang, { syndrome: (l) => label('alerts.syndrome', g.syndrome, l, SYNDROMES[g.syndrome].toLowerCase()), commune: commune.name });
+      // Titre enregistré en français (tableau de bord, dédoublonnage) ; le SMS suit la langue de chaque agent.
+      const title = titleIn('fr');
       const exists = await this.prisma.healthAlert.findFirst({ where: { auto: true, title, createdAt: { gte: since } } });
       if (exists) continue;
       await this.prisma.healthAlert.create({
@@ -162,9 +168,9 @@ export class AlertsService {
           communes: { create: [{ communeId: commune.id }] },
         },
       });
-      const officers = await this.prisma.user.findMany({ where: { role: 'MINISTRY', phone: { not: null } }, select: { phone: true } });
+      const officers = await this.prisma.user.findMany({ where: { role: 'MINISTRY', phone: { not: null } }, select: { phone: true, lang: true } });
       for (const o of officers) {
-        await this.outbox.send({ channel: 'SMS', to: o.phone!, body: `Ganji surveillance : ${title}. Voir le tableau de bord.`, ref: `cluster:${commune.id}:${g.syndrome}` });
+        await this.outbox.send({ channel: 'SMS', to: o.phone!, lang: o.lang, body: sms('alerts.cluster.sms', o.lang, { title: titleIn }), ref: `cluster:${commune.id}:${g.syndrome}` });
       }
       created.push(title);
     }

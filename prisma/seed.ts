@@ -251,7 +251,7 @@ async function main() {
       sex: 'M',
       bloodGroup: 'O+',
       allergies: ['Pénicilline'],
-      treatmentsEnc: crypto.encrypt('Imatinib 400 mg, 1 comprimé par jour · Allopurinol 300 mg · Acide folique 5 mg'),
+      treatmentsEnc: crypto.encrypt('Imatinib 400 mg, 1 comprimé par jour · Allopurinol 100 mg, 1 comprimé le matin · Acide folique 5 mg'),
       emergencyName: 'Afiavi Agossou (mère)',
       emergencyPhone: P.afiavi.phone,
       communeId: communeId('Abomey-Calavi'),

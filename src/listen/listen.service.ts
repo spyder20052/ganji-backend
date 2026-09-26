@@ -1,12 +1,11 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { ListenMessage, ListenThread } from '@prisma/client';
 import { normalizePhone } from '../auth/auth.dto';
-import { notifyInLang } from '../circle/notify';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { NotificationsService } from '../common/notifications.service';
-import { defineSms } from '../common/sms';
+import { note, sms } from '../common/i18n';
 import { detectDistress } from '../data/distress';
 import { PrismaService } from '../prisma/prisma.service';
 import { LISTEN_AUDIT_PREFIX } from './listen.constants';
@@ -33,25 +32,6 @@ export const MAX_MESSAGES = 100;
 const READ_LOG_EVERY_MS = 15 * 60_000;
 const SYSTEM_KEY = new Map<string, keyof typeof LISTEN_SYSTEM>(Object.entries(LISTEN_SYSTEM).map(([k, v]) => [v, k as keyof typeof LISTEN_SYSTEM]));
 type ThreadWithMessages = ListenThread & { messages: ListenMessage[] };
-
-defineSms({
-  // SMS : neutre, rien sur l'écoute ni sur ce qui a été écrit.
-  'listen.reply': { fr: "Ganji : vous avez un nouveau message dans l'application.", en: 'Ganji: you have a new message in the app.' },
-  // Notifications dans l'application (personne qui écrit).
-  'listen.n.reply.title': { fr: 'Nouveau message', en: 'New message' },
-  'listen.n.reply.body': { fr: 'L’écoute vous a répondu. Ouvrez la conversation.', en: 'The listening line has replied. Open the conversation.' },
-  'listen.n.closed.title': { fr: 'Conversation close', en: 'Conversation closed' },
-  'listen.n.closed.body': { fr: 'L’écoutante a clos la conversation. Vous pouvez en ouvrir une autre à tout moment.', en: 'The listener closed the conversation. You can open a new one at any time.' },
-  // Notifications de la cellule d'écoute.
-  'listen.n.urgent.title': { fr: 'Écoute : détresse signalée', en: 'Listening line: distress detected' },
-  'listen.n.urgent.body': { fr: 'Une personne a écrit des mots de détresse. Répondez en priorité.', en: 'Someone wrote words of distress. Reply first.' },
-  'listen.n.new.title': { fr: 'Écoute : nouvelle conversation', en: 'Listening line: new conversation' },
-  'listen.n.new.body': { fr: 'Une personne attend une réponse.', en: 'Someone is waiting for a reply.' },
-  'listen.n.message.title': { fr: 'Écoute : nouveau message', en: 'Listening line: new message' },
-  'listen.n.message.body': { fr: 'La personne que vous accompagnez a écrit.', en: 'The person you are supporting has written.' },
-  'listen.n.callback.title': { fr: 'Écoute : rappel demandé', en: 'Listening line: call-back requested' },
-  'listen.n.callback.body': { fr: 'Une personne demande à être rappelée.', en: 'Someone asked to be called back.' },
-});
 
 /** « Mme Hounkpè (écoute) » → « Mme Hounkpè ». */
 function shortName(displayName: string) {
@@ -121,12 +101,7 @@ export class ListenService {
   }
 
   private notifyCounselors(ids: string[], what: 'urgent' | 'new' | 'message' | 'callback', threadId: string) {
-    return notifyInLang(this.prisma, this.notifications, ids, {
-      kind: 'ECOUTE',
-      title: `listen.n.${what}.title`,
-      body: `listen.n.${what}.body`,
-      href: `/pro/ecoute?c=${threadId}`,
-    });
+    return this.notifications.notify(ids, { kind: 'ECOUTE', text: note(`listen.n.${what}.title`, `listen.n.${what}.body`), href: `/pro/ecoute?c=${threadId}` });
   }
 
   /** Mots de détresse : conversation urgente, consigne de sécurité, toute la cellule prévenue. */
@@ -366,12 +341,11 @@ export class ListenService {
     const previous = t.messages[t.messages.length - 1];
     await this.addMessages(id, [{ author: 'ECOUTANT', body: text }]);
     // Personne prévenue dans l'application ; par SMS (texte neutre) seulement pour la première réponse d'une série.
-    await notifyInLang(this.prisma, this.notifications, [t.userId], {
+    await this.notifications.notify(t.userId, {
       kind: 'ECOUTE',
-      title: 'listen.n.reply.title',
-      body: 'listen.n.reply.body',
+      text: note('listen.n.reply.title', 'listen.n.reply.body'),
       href: '/app/ecoute',
-      smsKey: previous?.author === 'ECOUTANT' ? undefined : 'listen.reply',
+      sms: previous?.author === 'ECOUTANT' ? undefined : (lang) => sms('listen.reply', lang),
       // Sans identifiant de conversation : la boîte d'envoi ne doit pas relier un numéro à une conversation anonyme.
       ref: 'listen',
     });
@@ -383,7 +357,7 @@ export class ListenService {
     if (t.status !== 'CLOS') {
       await this.prisma.listenThread.update({ where: { id }, data: { status: 'CLOS' } });
       await this.addMessages(id, [{ author: 'SYSTEME', body: LISTEN_SYSTEM.closedByCounselor }]);
-      await notifyInLang(this.prisma, this.notifications, [t.userId], { kind: 'ECOUTE', title: 'listen.n.closed.title', body: 'listen.n.closed.body', href: '/app/ecoute' });
+      await this.notifications.notify(t.userId, { kind: 'ECOUTE', text: note('listen.n.closed.title', 'listen.n.closed.body'), href: '/app/ecoute' });
     }
     return this.counselorGet(user, id);
   }

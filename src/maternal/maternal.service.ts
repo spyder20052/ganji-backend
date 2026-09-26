@@ -4,6 +4,7 @@ import { AccessService } from '../common/access.service';
 import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
+import { sms } from '../common/i18n';
 import { ANC_SCHEDULE, DANGER_SIGNS_PREGNANCY, VACCINE_SCHEDULE } from '../data/vaccines';
 import { RespondersService } from '../emergency/responders.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -160,7 +161,7 @@ export class MaternalService {
       const recipients = [...(await this.responders.relays(patient.communeId)), ...(await this.responders.caregivers(patient.id))];
       notified = await this.responders.notify(
         recipients,
-        `Ganji : ${patient.firstName} signale un signe de danger de grossesse. Merci de l'appeler et de l'accompagner à la maternité.`,
+        (lang) => sms('maternal.danger', lang, { prenom: patient.firstName }),
         `danger-sign:${pregnancy.id}`,
       );
     }

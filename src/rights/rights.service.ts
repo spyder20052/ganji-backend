@@ -5,19 +5,12 @@ import { normalizePhone } from '../auth/auth.dto';
 import type { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { NotificationsService } from '../common/notifications.service';
-import { defineSms, sms } from '../common/sms';
+import { note, sms } from '../common/i18n';
 import { PrismaService } from '../prisma/prisma.service';
 import { COVERAGE_REGISTRY, type CoverageRegistry, type RegistryReason, normalizeArch } from './coverage-registry';
 import { MOBILE_MONEY, type MobileMoneyGateway, PROVIDER_LABEL } from './mobile-money';
 import { ESTIMATE_TTL_MS, readEstimate, receiptLabel, signEstimate } from './estimate-token';
 import type { CoverageDto, EstimateDto, PaymentDto } from './rights.dto';
-
-defineSms({
-  'rights.payment': {
-    fr: 'Ganji : paiement de {amount} FCFA reçu. Reçu n° {receipt}. Détails dans l’application.',
-    en: 'Ganji: payment of {amount} FCFA received. Receipt no. {receipt}. Details in the app.',
-  },
-});
 
 /** 12500 → « 12 500 » (espaces simples : lisibles sur tous les téléphones). */
 function amountText(n: number) {
@@ -100,8 +93,7 @@ export class RightsService {
     if (result.status === 'ACTIF' && current.status !== 'ACTIF') {
       await this.notifications.notify(user.id, {
         kind: 'DROITS',
-        title: 'Couverture vérifiée',
-        body: `${row.scheme} : ${row.rate} % de vos soins pris en charge.`,
+        text: note('rights.n.coverage.title', 'rights.n.coverage.body', { scheme: row.scheme, rate: row.rate }),
         href: '/app/droits',
         ref: `coverage:${row.id}`,
       });
@@ -296,8 +288,7 @@ export class RightsService {
 
     await this.notifications.notify(user.id, {
       kind: 'DROITS',
-      title: 'Paiement reçu',
-      body: `${amountText(payment.amountFcfa)} FCFA · ${payment.label} · reçu ${payment.receipt}`,
+      text: note('rights.n.payment.title', 'rights.n.payment.body', { amount: amountText(payment.amountFcfa), label: payment.label, receipt: payment.receipt }),
       href: `/app/droits/recu/${payment.receipt}`,
       sms: (lang) => sms('rights.payment', lang, { amount: amountText(payment!.amountFcfa), receipt: payment!.receipt }),
       ref: `payment:${payment.id}`,

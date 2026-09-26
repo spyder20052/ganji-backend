@@ -1,6 +1,6 @@
 import { VISIT_REASON } from '../../src/circle/circle.service';
 import { nextVisitDue } from '../../src/circle/escalation';
-import { sms } from '../../src/common/sms';
+import { sms, type TextKey } from '../../src/common/i18n';
 import type { SeedCtx } from './context';
 
 /** Identifiants fixes : le seed se rejoue sans doublon. */
@@ -56,7 +56,7 @@ export async function seedCircle(ctx: SeedCtx) {
   });
 
   const missedHref = (reminderId: string) => `/app/cercle?p=${koffi.id}&r=${reminderId}`;
-  const notif = (userId: string, key: string, bodyKey: string, vars: Record<string, string>, href: string, createdAt: Date, read = false) => ({
+  const notif = (userId: string, key: TextKey, bodyKey: TextKey, vars: Record<string, string>, href: string, createdAt: Date, read = false) => ({
     userId,
     kind: 'CERCLE',
     title: sms(key, 'fr', vars),

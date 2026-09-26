@@ -6,6 +6,7 @@ import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { distanceKm } from '../common/geo';
+import { sms } from '../common/i18n';
 import { OutboxService } from '../common/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePrescriptionDto, PharmacyStockDto } from './medications.dto';
@@ -253,13 +254,14 @@ export class MedicationsService {
     }
 
     await this.audit.log({ actor: user, patientId: rx.patientId, action: 'WRITE', resource: 'Délivrance', reason: pharmacyName, ip });
-    const phone = patient.user?.phone ?? patient.parent?.user?.phone;
-    if (phone) {
+    // Titulaire du carnet, ou son parent pour un enfant : SMS dans la langue de celui qui le reçoit.
+    const holder = patient.user?.phone ? patient.user : patient.parent?.user;
+    if (holder?.phone) {
       await this.outbox.send({
         channel: 'SMS',
-        to: phone,
-        lang: patient.user?.lang ?? patient.parent?.user?.lang ?? 'fr',
-        body: `Ganji : votre ordonnance a été délivrée par ${pharmacyName}.`,
+        to: holder.phone,
+        lang: holder.lang,
+        body: sms('medications.dispensed', holder.lang, { pharmacy: pharmacyName }),
         ref: `prescription:${rx.id}`,
       });
     }

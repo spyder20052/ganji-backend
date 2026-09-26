@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Lang } from '@prisma/client';
 import { BloodService } from '../blood/blood.service';
 import { OutboxService } from '../common/outbox.service';
-import { defineSms, sms } from '../common/sms';
+import { shortDateTime, sms, type TextKey, type Vars } from '../common/i18n';
 import { TickRegistry } from '../common/tick.registry';
 import { normalizePhone } from '../auth/auth.dto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -19,24 +19,8 @@ const DEMO_HORIZON_HOURS = 48;
 export const TICK_BATCH = 200;
 export const TICK_BUDGET_MS = 20_000;
 
-function fmt(d: Date, lang: Lang = 'fr') {
-  return d.toLocaleString(lang === 'en' ? 'en-GB' : 'fr-FR', { timeZone: 'Africa/Porto-Novo', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-}
-
-/**
- * Rappels par SMS, dans la langue de chaque destinataire. La tâche planifiée peut partir plusieurs heures
- * avant : chaque texte donne donc le jour et l'heure (« ven. 26 sept., 13:00 »), jamais « c'est l'heure ».
- * Mode discret (téléphone partagé) : ni prénom, ni nature du soin, ni lieu.
- */
-defineSms({
-  'rappel.discret.prise': { fr: 'Ganji : rappel {quand}. Répondez 1 quand c’est fait.', en: 'Ganji: reminder {quand}. Reply 1 when done.' },
-  'rappel.discret.rdv': { fr: 'Ganji : vous avez un rendez-vous {quand}. Répondez 1 pour confirmer.', en: 'Ganji: you have an appointment {quand}. Reply 1 to confirm.' },
-  'rappel.cpn': { fr: 'Ganji : {prenom}, consultation prénatale {quand}{lieu}. Répondez 1 pour confirmer.', en: 'Ganji: {prenom}, antenatal visit {quand}{lieu}. Reply 1 to confirm.' },
-  'rappel.vaccin': { fr: 'Ganji : vaccin de votre enfant {quand}{lieu}. Apportez le carnet. Répondez 1 pour confirmer.', en: 'Ganji: your child’s vaccine {quand}{lieu}. Bring the health book. Reply 1 to confirm.' },
-  'rappel.prise': { fr: 'Ganji : {prenom}, prise de votre traitement {quand}. Répondez 1 quand c’est fait.', en: 'Ganji: {prenom}, time for your treatment {quand}. Reply 1 when done.' },
-  'rappel.analyse': { fr: 'Ganji : {prenom}, analyse {quand}{lieu}. Répondez 1 pour confirmer.', en: 'Ganji: {prenom}, lab test {quand}{lieu}. Reply 1 to confirm.' },
-  'rappel.rdv': { fr: 'Ganji : {prenom}, rendez-vous {quand}{lieu}. Répondez 1 pour confirmer.', en: 'Ganji: {prenom}, appointment {quand}{lieu}. Reply 1 to confirm.' },
-});
+/** Rappels, par type : le texte donne toujours le jour et l'heure (la tâche planifiée part en avance). */
+const REMINDER_KEY: Record<string, TextKey> = { CPN: 'rappel.cpn', VACCINE: 'rappel.vaccin', MEDICATION: 'rappel.prise', LAB: 'rappel.analyse' };
 
 /**
  * Canaux sans smartphone : SMS entrants, menu USSD et tâches planifiées.
@@ -106,6 +90,7 @@ export class ChannelsService {
   async inboundSms(rawFrom: string, body: string) {
     const from = normalizePhone(rawFrom);
     const text = body.trim().toUpperCase();
+    const lang = await this.langOf(from);
     let handled = 'IGNORE';
     let reply: string | null = null;
 
@@ -124,56 +109,66 @@ export class ChannelsService {
           // Même confirmation que dans l'application : le cercle de soins prévenu apprend que c'est fait.
           await this.circle.markConfirmed(reminder.id, { userId: reminder.byUserId });
           handled = 'RAPPEL_CONFIRME';
-          reply = 'Ganji : merci, votre confirmation est bien enregistrée.';
+          reply = sms('sms.reply.confirmed', lang);
         } else {
-          reply = "Ganji : aucune demande en attente pour ce numéro. Tapez RDV pour votre prochain rendez-vous.";
+          reply = sms('sms.reply.nothing', lang);
         }
       }
     } else if (text === 'RDV') {
       handled = 'RDV';
-      reply = await this.nextAppointmentText(from);
+      reply = await this.nextAppointmentText(from, lang);
     } else if (text === 'STOP') {
       handled = 'STOP';
       await this.prisma.donor.updateMany({ where: { phone: from }, data: { available: false } });
-      reply = 'Ganji : vous ne recevrez plus d’appels au don. Envoyez DON pour vous réinscrire.';
+      reply = sms('sms.reply.stop', lang);
     } else if (text === 'DON') {
       handled = 'DON';
       await this.prisma.donor.updateMany({ where: { phone: from }, data: { available: true } });
-      reply = 'Ganji : merci ! Vous êtes de nouveau disponible pour les appels au don.';
+      reply = sms('sms.reply.don', lang);
     } else {
-      reply = 'Ganji : commandes possibles : 1 (oui), 2 (non), RDV, DON, STOP. Pour une urgence, appelez le 118.';
+      reply = sms('sms.reply.help', lang);
     }
     await this.prisma.inbound.create({ data: { channel: 'SMS', from, body, handled } });
-    if (reply) await this.outbox.send({ channel: 'SMS', to: from, body: reply, ref: 'sms-reply' });
+    if (reply) await this.outbox.send({ channel: 'SMS', to: from, lang, body: reply, ref: 'sms-reply' });
     return { handled };
   }
 
-  /** Menu USSD *229*25# (simulé) : réponse texte, session sans état. */
+  /** Menu USSD *229*25# (simulé) : réponse texte, session sans état, dans la langue du numéro (CON : suite, END : fin). */
   async ussd(rawFrom: string, input: string) {
     const from = normalizePhone(rawFrom);
+    const lang = await this.langOf(from);
     const steps = input.split('*').filter(Boolean);
-    const menu = 'CON Ganji\n1. Mon prochain RDV\n2. Répondre à un appel au don\n3. Pharmacie de garde\n4. Urgence';
+    const menu = `CON ${sms('ussd.menu', lang)}`;
     if (steps.length === 0) return { text: menu };
     switch (steps[0]) {
       case '1':
-        return { text: `END ${await this.nextAppointmentText(from)}` };
+        return { text: `END ${await this.nextAppointmentText(from, lang)}` };
       case '2': {
         const donor = await this.prisma.donor.findUnique({ where: { phone: from } });
         const alert = donor ? await this.prisma.donorAlert.findFirst({ where: { donorId: donor.id, status: 'ENVOYEE' }, include: { request: { include: { facility: true } } } }) : null;
-        if (!alert) return { text: 'END Aucun appel au don en attente.' };
-        if (steps.length === 1) return { text: `CON Don de sang à ${alert.request.facility.shortName ?? alert.request.facility.name}\n1. Oui, je viens\n2. Non, pas cette fois` };
+        if (!alert) return { text: `END ${sms('ussd.don.none', lang)}` };
+        if (steps.length === 1) return { text: `CON ${sms('ussd.don.ask', lang, { place: alert.request.facility.shortName ?? alert.request.facility.name })}` };
         const r = await this.blood.respond(alert.id, steps[1] === '1', 'USSD');
-        return { text: r.status === 'ACCEPTEE' && 'appointment' in r && r.appointment ? `END Merci ! RDV ${fmt(r.appointment)}.` : 'END Merci pour votre réponse.' };
+        const at = r.status === 'ACCEPTEE' && 'appointment' in r ? r.appointment : null;
+        return { text: `END ${at ? sms('ussd.don.thanksRdv', lang, { when: (l) => shortDateTime(at, l) }) : sms('ussd.don.thanks', lang)}` };
       }
       case '3': {
         const pharmacies = await this.prisma.facility.findMany({ where: { type: 'PHARMACIE', onDuty: true }, take: 3, include: { commune: true } });
-        return { text: `END Pharmacies de garde :\n${pharmacies.map((p) => `- ${p.name} (${p.commune.name})`).join('\n')}` };
+        return { text: `END ${sms('ussd.pharmacies', lang, { list: pharmacies.map((p) => `- ${p.name} (${p.commune.name})`).join('\n') })}` };
       }
       case '4':
-        return { text: 'END Urgence : appelez le 118 (pompiers). Allez à l’hôpital le plus proche. Montrez votre carte QR Ganji.' };
+        return { text: `END ${sms('ussd.emergency', lang)}` };
       default:
         return { text: menu };
     }
+  }
+
+  /** Langue d'un numéro : celle du compte, sinon celle du donneur inscrit par SMS, sinon le français. */
+  private async langOf(phone: string): Promise<Lang> {
+    const user = await this.prisma.user.findUnique({ where: { phone }, select: { lang: true } });
+    if (user) return user.lang;
+    const donor = await this.prisma.donor.findUnique({ where: { phone }, select: { lang: true } });
+    return donor?.lang ?? 'fr';
   }
 
   /** Rappel en attente pour ce numéro : le sien, ou celui d'une personne accompagnée (l'aidant reçoit aussi les rappels). */
@@ -196,14 +191,16 @@ export class ChannelsService {
     return r ? { id: r.id, byUserId: user.id } : null;
   }
 
-  private async nextAppointmentText(phone: string) {
+  private async nextAppointmentText(phone: string, lang: Lang) {
     const user = await this.prisma.user.findUnique({ where: { phone }, include: { patient: true } });
-    if (!user?.patient) return 'Ganji : aucun carnet lié à ce numéro.';
+    if (!user?.patient) return sms('sms.rdv.noRecord', lang);
     const next = await this.prisma.reminder.findFirst({
       where: { patientId: user.patient.id, dueAt: { gte: new Date() }, kind: { in: ['APPOINTMENT', 'CPN', 'VACCINE', 'LAB'] } },
       orderBy: { dueAt: 'asc' },
     });
-    return next ? `Ganji : prochain rendez-vous ${fmt(next.dueAt)}${next.place ? ` à ${next.place}` : ''}.` : 'Ganji : aucun rendez-vous prévu.';
+    if (!next) return sms('sms.rdv.none', lang);
+    const when = (l: Lang) => shortDateTime(next.dueAt, l);
+    return next.place ? sms('sms.rdv.nextAt', lang, { when, place: next.place }) : sms('sms.rdv.next', lang, { when });
   }
 
   /**
@@ -260,7 +257,9 @@ export class ChannelsService {
         for (const u of recipients) {
           const text = this.reminderText(r.kind, r.dueAt, r.place, r.patient.firstName, r.patient.discreetMode, u.lang);
           if (r.channels.includes('SMS')) await this.outbox.send({ channel: 'SMS', to: u.phone!, lang: u.lang, body: text, ref: `reminder:${r.id}`, audioKey: `reminder.${r.kind.toLowerCase()}` });
-          if (r.channels.includes('VOICE')) await this.outbox.send({ channel: 'VOICE', to: u.phone!, lang: u.lang, body: `Message vocal (${u.lang}) : ${text}`, ref: `reminder:${r.id}`, audioKey: `reminder.${r.kind.toLowerCase()}` });
+          if (r.channels.includes('VOICE')) {
+            await this.outbox.send({ channel: 'VOICE', to: u.phone!, lang: u.lang, body: sms('voice.message', u.lang, { lang: u.lang, text }), ref: `reminder:${r.id}`, audioKey: `reminder.${r.kind.toLowerCase()}` });
+          }
           if (r.channels.includes('APP')) await this.outbox.send({ channel: 'PUSH', to: u.phone!, lang: u.lang, body: text, ref: `reminder:${r.id}` });
         }
         await this.prisma.reminder.update({ where: { id: r.id }, data: { sentAt: new Date() } });
@@ -279,10 +278,9 @@ export class ChannelsService {
   }
 
   private reminderText(kind: string, dueAt: Date, place: string | null, firstName: string, discreet: boolean, lang: Lang) {
-    const vars = { quand: fmt(dueAt, lang), prenom: firstName, lieu: place ? ` · ${place}` : '' };
+    const vars: Vars = { quand: (l) => shortDateTime(dueAt, l), prenom: firstName, lieu: place ? ` · ${place}` : '' };
     if (discreet) return sms(kind === 'MEDICATION' ? 'rappel.discret.prise' : 'rappel.discret.rdv', lang, vars);
-    const key = { CPN: 'rappel.cpn', VACCINE: 'rappel.vaccin', MEDICATION: 'rappel.prise', LAB: 'rappel.analyse' }[kind] ?? 'rappel.rdv';
-    return sms(key, lang, vars);
+    return sms(REMINDER_KEY[kind] ?? 'rappel.rdv', lang, vars);
   }
 
   async assertPhoneKnown(phone: string) {

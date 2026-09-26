@@ -1,16 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import type { Lang } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { Localized } from './i18n';
 import { OutboxService } from './outbox.service';
 
 export type NotificationKind = 'RDV' | 'SANG' | 'COMMANDE' | 'ECOUTE' | 'CERCLE' | 'DROITS' | 'TRAITEMENT' | 'PARTAGE' | 'PROFIL' | 'SYSTEME';
 
 export interface NotificationInput {
   kind: NotificationKind;
-  title: string;
-  body: string;
+  /**
+   * Titre et texte dans la langue de chaque destinataire (réglage de l'application) : `note(titre, texte, vars)`
+   * ou `(lang) => ({ title: text(…), body: text(…) })` (common/i18n). Stockés déjà traduits.
+   */
+  text: Localized;
   href?: string;
-  /** SMS envoyé en plus, texte déjà dans la langue de la personne (sms() de common/sms.ts), sans donnée médicale. */
+  /** SMS envoyé en plus, dans la langue de la personne (sms() de common/i18n), sans donnée médicale. */
   sms?: (lang: Lang) => string;
   ref?: string;
 }
@@ -29,12 +33,15 @@ export class NotificationsService {
   async notify(userIds: string | string[], n: NotificationInput) {
     const ids = [...new Set((Array.isArray(userIds) ? userIds : [userIds]).filter(Boolean))];
     if (!ids.length) return 0;
-    await this.prisma.notification.createMany({ data: ids.map((userId) => ({ userId, kind: n.kind, title: n.title, body: n.body, href: n.href })) });
+    const users = await this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, phone: true, lang: true } });
+    // Chaque langue n'est rendue qu'une fois, quel que soit le nombre de destinataires.
+    const byLang = new Map<Lang, { title: string; body: string }>();
+    const inLang = (lang: Lang) => byLang.get(lang) ?? byLang.set(lang, n.text(lang)).get(lang)!;
+    await this.prisma.notification.createMany({ data: users.map((u) => ({ userId: u.id, kind: n.kind, ...inLang(u.lang), href: n.href })) });
     if (n.sms) {
-      const users = await this.prisma.user.findMany({ where: { id: { in: ids }, phone: { not: null } }, select: { phone: true, lang: true } });
-      for (const u of users) await this.outbox.send({ channel: 'SMS', to: u.phone!, lang: u.lang, body: n.sms(u.lang), ref: n.ref });
+      for (const u of users) if (u.phone) await this.outbox.send({ channel: 'SMS', to: u.phone, lang: u.lang, body: n.sms(u.lang), ref: n.ref });
     }
-    return ids.length;
+    return users.length;
   }
 
   /** Utilisateurs d'un rôle (et, au besoin, d'un établissement) : ANTS, pharmacie, soignants d'un site… */

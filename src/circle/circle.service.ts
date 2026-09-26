@@ -4,7 +4,7 @@ import { AccessService } from '../common/access.service';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth-user';
 import { NotificationsService } from '../common/notifications.service';
-import { defineSms } from '../common/sms';
+import { note, sms } from '../common/i18n';
 import { TickRegistry } from '../common/tick.registry';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CircleSettingsDto } from './circle.dto';
@@ -20,62 +20,12 @@ import {
   reminderState,
   waitingSince,
 } from './escalation';
-import { notifyInLang } from './notify';
 
 const HOUR = 3_600_000;
 /** Motif d'une visite du relais : jamais de détail médical (phrase française = clé, traduite à l'affichage). */
 export const VISIT_REASON = 'Rappel resté sans réponse : passer prendre des nouvelles.';
 /** Relais prévenus au plus, quand la commune n'en a pas (même repli que les secours de proximité). */
 const MAX_RELAYS = 3;
-
-defineSms({
-  // SMS : neutres (ni traitement ni rendez-vous), un prénom au plus, rien en mode discret.
-  'circle.sms.missed': {
-    fr: 'Ganji : {name} n’a pas confirmé un rappel. Prenez de ses nouvelles. Répondez 1 si c’est fait.',
-    en: 'Ganji: {name} has not confirmed a reminder. Please check on them. Reply 1 if it is done.',
-  },
-  'circle.sms.missed.discreet': {
-    fr: 'Ganji : un rappel de votre proche n’a pas été confirmé. Prenez de ses nouvelles. Répondez 1 si c’est fait.',
-    en: 'Ganji: a reminder for your relative has not been confirmed. Please check on them. Reply 1 if it is done.',
-  },
-  'circle.sms.visit': {
-    fr: 'Ganji : une visite à domicile vous est demandée. Ouvrez l’application Ganji pour voir où et quand.',
-    en: 'Ganji: a home visit is requested. Open the Ganji app to see where and when.',
-  },
-  'circle.sms.visitDone': { fr: 'Ganji : le relais est passé voir {name}. Détails dans l’application.', en: 'Ganji: the community relay visited {name}. Details in the app.' },
-  'circle.sms.visitDone.discreet': {
-    fr: 'Ganji : le relais est passé voir votre proche. Détails dans l’application.',
-    en: 'Ganji: the community relay visited your relative. Details in the app.',
-  },
-  // Notifications dans l'application.
-  'circle.n.missed.title': { fr: 'Rappel sans réponse', en: 'Unanswered reminder' },
-  'circle.n.missed.body': {
-    fr: '{name} n’a pas confirmé un rappel depuis 2 h. Prenez de ses nouvelles.',
-    en: '{name} has not confirmed a reminder for 2 hours. Please check on them.',
-  },
-  'circle.n.self.body': {
-    fr: 'Touchez « C’est fait » si c’est fait. Votre cercle de soins est prévenu.',
-    en: 'Tap “Done” if it is done. Your circle of care has been told.',
-  },
-  'circle.n.visit.title': { fr: 'Visite à faire', en: 'Home visit to do' },
-  'circle.n.visit.body': { fr: '{name}, {commune} : passer prendre des nouvelles.', en: '{name}, {commune}: drop by to check on them.' },
-  'circle.n.visitPlanned.title': { fr: 'Visite du relais', en: 'Community relay visit' },
-  'circle.n.visitPlanned.body': { fr: '{relay} passera prendre de vos nouvelles.', en: '{relay} will drop by to check on you.' },
-  'circle.n.visitDone.title': { fr: 'Visite faite', en: 'Visit done' },
-  'circle.n.visitDone.body': { fr: '{relay} est passé prendre de vos nouvelles.', en: '{relay} dropped by to check on you.' },
-  'circle.n.visitDoneCg.body': { fr: '{relay} est passé voir {name}.', en: '{relay} visited {name}.' },
-  'circle.n.done.title': { fr: 'C’est fait', en: 'Done' },
-  'circle.n.done.body': { fr: '{name} a confirmé son rappel.', en: '{name} confirmed the reminder.' },
-  'circle.n.visitCancelled.title': { fr: 'Visite annulée', en: 'Visit cancelled' },
-  'circle.n.visitCancelled.body': {
-    fr: '{name} a confirmé son rappel : la visite n’est plus nécessaire.',
-    en: '{name} confirmed the reminder: the visit is no longer needed.',
-  },
-  'circle.n.visitCancelled.answered': {
-    fr: '{name} a répondu à son rappel : la visite n’est plus nécessaire.',
-    en: '{name} answered the reminder: the visit is no longer needed.',
-  },
-});
 
 /** « Mathieu Gounou (relais) » → « Mathieu Gounou ». */
 function shortName(displayName: string) {
@@ -342,11 +292,9 @@ export class CircleService implements OnModuleInit {
     if (claim.count === 0 || r.escalation < 1) return updated;
 
     const alerted = await this.prisma.notification.findMany({ where: { kind: 'CERCLE', href: missedHref(r.patientId, r.id) }, select: { userId: true } });
-    await notifyInLang(
-      this.prisma,
-      this.notifications,
+    await this.notifications.notify(
       alerted.map((n) => n.userId).filter((id) => id !== by.userId),
-      { kind: 'CERCLE', title: 'circle.n.done.title', body: 'circle.n.done.body', vars: { name: r.patient.firstName }, href: `/app/cercle?p=${r.patientId}` },
+      { kind: 'CERCLE', text: note('circle.n.done.title', 'circle.n.done.body', { name: r.patient.firstName }), href: `/app/cercle?p=${r.patientId}` },
     );
     await this.cancelPendingVisits([r.id], 'confirmed');
     return updated;
@@ -367,11 +315,9 @@ export class CircleService implements OnModuleInit {
       const claim = await this.prisma.relayVisit.updateMany({ where: { id: v.id, status: 'A_FAIRE' }, data: { status: 'ANNULEE', doneAt: new Date() } });
       if (claim.count === 0) continue;
       const relays = v.relayId ? [v.relayId] : (await this.relaysFor(v.communeId)).map((x) => x.id);
-      await notifyInLang(this.prisma, this.notifications, relays, {
+      await this.notifications.notify(relays, {
         kind: 'CERCLE',
-        title: 'circle.n.visitCancelled.title',
-        body: why === 'confirmed' ? 'circle.n.visitCancelled.body' : 'circle.n.visitCancelled.answered',
-        vars: { name: v.patient.firstName },
+        text: note('circle.n.visitCancelled.title', why === 'confirmed' ? 'circle.n.visitCancelled.body' : 'circle.n.visitCancelled.answered', { name: v.patient.firstName }),
         href: '/relais#visites',
       });
     }
@@ -414,18 +360,17 @@ export class CircleService implements OnModuleInit {
   private async alertCaregivers(r: Reminder & { patient: { id: string; firstName: string; discreetMode: boolean; userId: string | null } }) {
     const delegations = await this.prisma.delegation.findMany({ where: { patientId: r.patientId, revokedAt: null }, select: { caregiverId: true, scopes: true } });
     const ids = delegations.filter((d) => receivesReminders(d.scopes)).map((d) => d.caregiverId);
-    await notifyInLang(this.prisma, this.notifications, ids, {
+    const vars = { name: r.patient.firstName };
+    await this.notifications.notify(ids, {
       kind: 'CERCLE',
-      title: 'circle.n.missed.title',
-      body: 'circle.n.missed.body',
-      vars: { name: r.patient.firstName },
+      text: note('circle.n.missed.title', 'circle.n.missed.body', vars),
       href: missedHref(r.patientId, r.id),
-      smsKey: r.patient.discreetMode ? 'circle.sms.missed.discreet' : 'circle.sms.missed',
+      sms: (lang) => sms(r.patient.discreetMode ? 'circle.sms.missed.discreet' : 'circle.sms.missed', lang, vars),
       ref: `circle:${r.id}:1`,
     });
     // Le patient aussi, dans l'application : il sait que son cercle est prévenu.
     if (r.patient.userId) {
-      await notifyInLang(this.prisma, this.notifications, [r.patient.userId], { kind: 'CERCLE', title: 'circle.n.missed.title', body: 'circle.n.self.body', href: '/app/cercle' });
+      await this.notifications.notify(r.patient.userId, { kind: 'CERCLE', text: note('circle.n.missed.title', 'circle.n.self.body'), href: '/app/cercle' });
     }
     return ids.length;
   }
@@ -439,26 +384,20 @@ export class CircleService implements OnModuleInit {
     const visit = await this.prisma.relayVisit.create({
       data: { patientId: r.patientId, communeId: r.patient.communeId, relayId: first?.id ?? null, relayName: first?.name ?? null, reason: VISIT_REASON, reminderId: r.id, dueAt: nextVisitDue(now) },
     });
-    await notifyInLang(
-      this.prisma,
-      this.notifications,
+    await this.notifications.notify(
       relays.map((x) => x.id),
       {
         kind: 'CERCLE',
-        title: 'circle.n.visit.title',
-        body: 'circle.n.visit.body',
-        vars: { name: r.patient.firstName, commune: r.patient.commune?.name ?? '' },
+        text: note('circle.n.visit.title', 'circle.n.visit.body', { name: r.patient.firstName, commune: r.patient.commune?.name ?? '' }),
         href: '/relais#visites',
-        smsKey: 'circle.sms.visit',
+        sms: (lang) => sms('circle.sms.visit', lang),
         ref: `relay-visit:${visit.id}`,
       },
     );
     if (r.patient.userId && first) {
-      await notifyInLang(this.prisma, this.notifications, [r.patient.userId], {
+      await this.notifications.notify(r.patient.userId, {
         kind: 'CERCLE',
-        title: 'circle.n.visitPlanned.title',
-        body: 'circle.n.visitPlanned.body',
-        vars: { relay: first.name },
+        text: note('circle.n.visitPlanned.title', 'circle.n.visitPlanned.body', { relay: first.name }),
         href: '/app/cercle',
       });
     }
@@ -507,7 +446,7 @@ export class CircleService implements OnModuleInit {
     return { todo: todo.map((v) => this.visitView(v)), done: done.map((v) => this.visitView(v)) };
   }
 
-  async visitDone(user: AuthUser, id: string, note?: string) {
+  async visitDone(user: AuthUser, id: string, relayNote?: string) {
     const v = await this.prisma.relayVisit.findUnique({ where: { id }, include: { patient: { select: { id: true, firstName: true, discreetMode: true, userId: true } } } });
     if (!v) throw new NotFoundException('Visite introuvable');
     const communeId = await this.relayCommune(user.id);
@@ -516,33 +455,26 @@ export class CircleService implements OnModuleInit {
     const relay = shortName(user.name);
     const updated = await this.prisma.relayVisit.update({
       where: { id },
-      data: { status: 'FAITE', doneAt: new Date(), note: note?.trim() || null, relayId: user.id, relayName: relay },
+      data: { status: 'FAITE', doneAt: new Date(), note: relayNote?.trim() || null, relayId: user.id, relayName: relay },
       include: { patient: { select: { firstName: true, address: true, commune: { select: { name: true } } } } },
     });
     await this.audit.log({ actor: user, patientId: v.patientId, action: 'WRITE', resource: 'Visite du relais communautaire (cercle de soins)' });
 
     if (v.patient.userId) {
-      await notifyInLang(this.prisma, this.notifications, [v.patient.userId], {
+      await this.notifications.notify(v.patient.userId, {
         kind: 'CERCLE',
-        title: 'circle.n.visitDone.title',
-        body: 'circle.n.visitDone.body',
-        vars: { relay },
+        text: note('circle.n.visitDone.title', 'circle.n.visitDone.body', { relay }),
         href: '/app/cercle',
       });
     }
     const delegations = await this.prisma.delegation.findMany({ where: { patientId: v.patientId, revokedAt: null }, select: { caregiverId: true, scopes: true } });
-    await notifyInLang(
-      this.prisma,
-      this.notifications,
+    await this.notifications.notify(
       delegations.filter((d) => receivesReminders(d.scopes)).map((d) => d.caregiverId),
       {
         kind: 'CERCLE',
-        title: 'circle.n.visitDone.title',
-        body: 'circle.n.visitDoneCg.body',
-        vars: { relay, name: v.patient.firstName },
+        text: note('circle.n.visitDone.title', 'circle.n.visitDoneCg.body', { relay, name: v.patient.firstName }),
         href: `/app/cercle?p=${v.patientId}`,
-        smsKey: v.patient.discreetMode ? 'circle.sms.visitDone.discreet' : 'circle.sms.visitDone',
-        smsVars: { name: v.patient.firstName },
+        sms: (lang) => sms(v.patient.discreetMode ? 'circle.sms.visitDone.discreet' : 'circle.sms.visitDone', lang, { name: v.patient.firstName }),
         ref: `relay-visit:${v.id}:done`,
       },
     );

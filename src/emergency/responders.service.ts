@@ -85,11 +85,11 @@ export class RespondersService {
   }
 
   /**
-   * Envoie le même message à chaque destinataire (dédoublonnés). Un échec
-   * d'envoi n'empêche pas les suivants : en situation d'urgence, chaque
-   * contact prévenu compte. Renvoie le nombre de messages mis en file.
+   * Envoie le même message à chaque destinataire (dédoublonnés), dans sa langue : `body` reçoit la langue
+   * et rend le texte (sms() de common/i18n). Un échec d'envoi n'empêche pas les suivants : en situation
+   * d'urgence, chaque contact prévenu compte. Renvoie le nombre de messages mis en file.
    */
-  async notify(recipients: Recipient[], body: string, ref: string, audioKey?: string): Promise<number> {
+  async notify(recipients: Recipient[], body: (lang: Lang) => string, ref: string, audioKey?: string): Promise<number> {
     const seen = new Set<string>();
     let sent = 0;
     for (const r of recipients) {
@@ -97,7 +97,7 @@ export class RespondersService {
       if (seen.has(key)) continue;
       seen.add(key);
       try {
-        await this.outbox.send({ channel: r.channel ?? 'SMS', to: r.to, lang: r.lang, body, ref, audioKey });
+        await this.outbox.send({ channel: r.channel ?? 'SMS', to: r.to, lang: r.lang, body: body(r.lang), ref, audioKey });
         sent++;
       } catch (err) {
         this.logger.warn(`Envoi impossible (ref=${ref}) : ${(err as Error).message}`);

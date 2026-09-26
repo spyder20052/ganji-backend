@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { CircleService } from '../src/circle/circle.service';
 import { beninDay, canConfirm, escalationLevel, nextVisitDue, reminderState } from '../src/circle/escalation';
 import { OutboxService } from '../src/common/outbox.service';
-import { sms } from '../src/common/sms';
+import { sms } from '../src/common/i18n';
 // Textes SMS de l'écoute (déclarés au chargement du module).
 import '../src/listen/listen.service';
 
@@ -111,7 +111,7 @@ describe('Cercle de soins : tâche planifiée', () => {
 
   it('les SMS du cercle restent neutres (acceptés par la file d’envoi)', async () => {
     const outbox = new OutboxService({ outbox: { create: vi.fn(async ({ data }) => data) } } as never);
-    for (const key of ['circle.sms.missed', 'circle.sms.missed.discreet', 'circle.sms.visit', 'circle.sms.visitDone', 'listen.reply']) {
+    for (const key of ['circle.sms.missed', 'circle.sms.missed.discreet', 'circle.sms.visit', 'circle.sms.visitDone', 'listen.reply'] as const) {
       await expect(outbox.send({ channel: 'SMS', to: '0190000002', body: sms(key, 'fr', { name: 'Koffi' }) })).resolves.toBeTruthy();
       await expect(outbox.send({ channel: 'SMS', to: '0190000002', body: sms(key, 'en', { name: 'Koffi' }) })).resolves.toBeTruthy();
     }

@@ -5,36 +5,13 @@ import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { distanceKm } from '../common/geo';
 import { NotificationsService } from '../common/notifications.service';
 import { OutboxService } from '../common/outbox.service';
-import { defineSms, sms } from '../common/sms';
+import { note, sms, type Localized } from '../common/i18n';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfirmDto, CreateAppointmentDto, FacilitiesQuery, RefuseDto } from './appointments.dto';
 import { canMove, checkPreferred, partOfDay, preferredText, reminderTitle, serviceLabel, sortForPatient, staffFilter, when, type ServiceCode } from './appointments.logic';
 
-// Jamais la spécialité ni le motif dans un SMS : un lieu, une date, une consigne.
-defineSms({
-  'rdv.confirmed': {
-    fr: 'Ganji : votre rendez-vous est confirmé le {when} à {place}. Ouvrez Ganji pour les détails.',
-    en: 'Ganji: your appointment is confirmed for {when} at {place}. Open Ganji for details.',
-  },
-  'rdv.confirmed.other': {
-    fr: 'Ganji : le rendez-vous de {prenom} est confirmé le {when} à {place}.',
-    en: "Ganji: {prenom}'s appointment is confirmed for {when} at {place}.",
-  },
-  'rdv.refused': {
-    fr: 'Ganji : {place} ne peut pas vous recevoir à la date demandée. Ouvrez Ganji pour voir la réponse et choisir une autre date.',
-    en: 'Ganji: {place} cannot see you on the requested date. Open Ganji to read the reply and choose another date.',
-  },
-  'rdv.refused.other': {
-    fr: 'Ganji : {place} ne peut pas recevoir {prenom} à la date demandée. Ouvrez Ganji pour voir la réponse.',
-    en: 'Ganji: {place} cannot see {prenom} on the requested date. Open Ganji to read the reply.',
-  },
-  'rdv.discreet': { fr: 'Ganji : vous avez un nouveau message. Ouvrez l’application.', en: 'Ganji: you have a new message. Open the app.' },
-});
-
 const HOUR = 3600_000;
 const DAY = 24 * HOUR;
-type Two = 'fr' | 'en';
-const two = (l: Lang | null | undefined): Two => (l === 'en' ? 'en' : 'fr');
 
 interface Recipient {
   userId: string;
@@ -123,10 +100,11 @@ export class AppointmentsService {
 
     const staffIds = await this.staffOf(facility.id);
     const who = `${a.patient.firstName} ${a.patient.lastName.charAt(0)}.`;
-    await this.notifyEach(staffIds, (lang) => ({
-      title: lang === 'en' ? 'New appointment request' : 'Nouvelle demande de rendez-vous',
-      body: `${who} · ${serviceLabel(code, lang)} · ${preferredText(preferredAt, lang)}`,
-    }), '/pro/rendez-vous');
+    await this.notifyEach(
+      staffIds,
+      note('rdv.n.request.title', 'rdv.n.request.body', { who, service: (l) => serviceLabel(code, l), preferred: (l) => preferredText(preferredAt, l) }),
+      '/pro/rendez-vous',
+    );
     return this.presentForPatient(a, user);
   }
 
@@ -153,10 +131,11 @@ export class AppointmentsService {
     await this.audit.log({ actor: user, patientId: a.patientId, action: 'APPOINTMENT', resource: `Rendez-vous annulé (${a.facilityName})`, ip });
     const who = `${a.patient.firstName} ${a.patient.lastName.charAt(0)}.`;
     const date = a.scheduledAt ?? a.preferredAt;
-    await this.notifyEach(await this.staffOf(a.facilityId), (lang) => ({
-      title: lang === 'en' ? 'Appointment cancelled' : 'Rendez-vous annulé',
-      body: `${who} · ${a.scheduledAt ? when(date, lang) : preferredText(date, lang)}`,
-    }), '/pro/rendez-vous');
+    await this.notifyEach(
+      await this.staffOf(a.facilityId),
+      note('rdv.n.cancelled.title', 'rdv.n.cancelled.body', { who, date: (l) => (a.scheduledAt ? when(date, l) : preferredText(date, l)) }),
+      '/pro/rendez-vous',
+    );
     return this.presentForPatient(updated, user);
   }
 
@@ -236,11 +215,8 @@ export class AppointmentsService {
     const place = a.facilityName;
     await this.tellPatientSide(
       a,
-      (lang) => ({
-        title: lang === 'en' ? 'Appointment confirmed' : 'Rendez-vous confirmé',
-        body: `${place} · ${when(scheduledAt, lang)}${updated.answer ? ` · ${updated.answer}` : ''}`,
-      }),
-      (r, prenom) => sms(r.owner ? 'rdv.confirmed' : 'rdv.confirmed.other', r.lang, { when: when(scheduledAt, two(r.lang)), place, prenom }),
+      note('rdv.n.confirmed.title', updated.answer ? 'rdv.n.confirmed.bodyAnswer' : 'rdv.n.confirmed.body', { place, when: (l) => when(scheduledAt, l), answer: updated.answer ?? '' }),
+      (r, prenom) => sms(r.owner ? 'rdv.confirmed' : 'rdv.confirmed.other', r.lang, { when: (l) => when(scheduledAt, l), place, prenom }),
     );
     return updated;
   }
@@ -257,7 +233,7 @@ export class AppointmentsService {
     const place = a.facilityName;
     await this.tellPatientSide(
       a,
-      (lang) => ({ title: lang === 'en' ? 'Appointment not possible' : 'Rendez-vous impossible', body: `${place} : ${updated.answer}` }),
+      note('rdv.n.refused.title', 'rdv.n.refused.body', { place, answer: updated.answer ?? '' }),
       (r, prenom) => sms(r.owner ? 'rdv.refused' : 'rdv.refused.other', r.lang, { place, prenom }),
     );
     return updated;
@@ -338,18 +314,13 @@ export class AppointmentsService {
     return [...doctors, ...nurses];
   }
 
-  /** Notification dans la langue de chacun (français ou anglais). */
-  private async notifyEach(userIds: string[], text: (lang: Two) => { title: string; body: string }, href: string) {
-    if (!userIds.length) return;
-    const users = await this.prisma.user.findMany({ where: { id: { in: userIds } }, select: { id: true, lang: true } });
-    for (const lang of ['fr', 'en'] as const) {
-      const ids = users.filter((u) => two(u.lang) === lang).map((u) => u.id);
-      if (ids.length) await this.notifications.notify(ids, { kind: 'RDV', href, ...text(lang) });
-    }
+  /** Notification dans la langue de chacun. */
+  private async notifyEach(userIds: string[], text: Localized, href: string) {
+    await this.notifications.notify(userIds, { kind: 'RDV', href, text });
   }
 
   /** La personne (ou le parent d'un enfant) et ses aidants « rendez-vous » : notification + SMS (neutre en mode discret). */
-  private async tellPatientSide(a: Appointment, text: (lang: Two) => { title: string; body: string }, smsText: (r: Recipient, prenom: string) => string) {
+  private async tellPatientSide(a: Appointment, text: Localized, smsText: (r: Recipient, prenom: string) => string) {
     const patient = await this.prisma.patient.findUniqueOrThrow({
       where: { id: a.patientId },
       select: {

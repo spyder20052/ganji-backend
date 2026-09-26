@@ -5,21 +5,10 @@ import { AuditService } from '../common/audit.service';
 import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { OutboxService } from '../common/outbox.service';
-import { defineSms, sms } from '../common/sms';
+import { sms } from '../common/i18n';
 import { PrismaService } from '../prisma/prisma.service';
 import { toLang, type UiLang } from '../profile/profile.logic';
 import { normalizePhone, RegisterDto } from './auth.dto';
-
-defineSms({
-  'auth.otp': {
-    fr: 'Ganji : votre code de connexion est {code}. Il expire dans 5 minutes. Ne le communiquez à personne.',
-    en: 'Ganji: your login code is {code}. It expires in 5 minutes. Do not share it with anyone.',
-  },
-  'auth.newLogin': {
-    fr: "Ganji : nouvelle connexion à votre compte. Si ce n'est pas vous, appelez le relais de votre commune.",
-    en: 'Ganji: new login to your account. If this was not you, call the community relay of your area.',
-  },
-});
 
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;

@@ -5,6 +5,7 @@ import { AccessService } from '../common/access.service';
 import { AuditService } from '../common/audit.service';
 import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
+import { note } from '../common/i18n';
 import { NotificationsService } from '../common/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateProfileDto, VitalsDto } from './profile.dto';
@@ -231,12 +232,9 @@ export class ProfileService {
     });
     await this.audit.log({ actor: user, patientId, action: 'WRITE', resource: what.join(', ').replace(/^./, (c) => c.toUpperCase()), ip });
     if (before.userId && dto.bloodGroup) {
-      const owner = await this.prisma.user.findUnique({ where: { id: before.userId }, select: { lang: true } });
-      const en = owner?.lang === 'en';
       await this.notifications.notify(before.userId, {
         kind: 'PROFIL',
-        title: en ? 'Blood group verified' : 'Groupe sanguin vérifié',
-        body: en ? `${user.name} confirmed your blood group: ${dto.bloodGroup}.` : `${user.name} a confirmé votre groupe sanguin : ${dto.bloodGroup}.`,
+        text: note('profile.n.bloodVerified.title', 'profile.n.bloodVerified.body', { name: user.name, group: dto.bloodGroup }),
         href: '/app/profil',
       });
     }
