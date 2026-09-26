@@ -5,8 +5,21 @@ import { AuditService } from '../common/audit.service';
 import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { OutboxService } from '../common/outbox.service';
+import { defineSms, sms } from '../common/sms';
 import { PrismaService } from '../prisma/prisma.service';
+import { toLang, type UiLang } from '../profile/profile.logic';
 import { normalizePhone, RegisterDto } from './auth.dto';
+
+defineSms({
+  'auth.otp': {
+    fr: 'Ganji : votre code de connexion est {code}. Il expire dans 5 minutes. Ne le communiquez à personne.',
+    en: 'Ganji: your login code is {code}. It expires in 5 minutes. Do not share it with anyone.',
+  },
+  'auth.newLogin': {
+    fr: "Ganji : nouvelle connexion à votre compte. Si ce n'est pas vous, appelez le relais de votre commune.",
+    en: 'Ganji: new login to your account. If this was not you, call the community relay of your area.',
+  },
+});
 
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
@@ -42,7 +55,7 @@ export class AuthService {
         channel: 'SMS',
         to: phone,
         lang: user.lang,
-        body: `Ganji : votre code de connexion est ${code}. Il expire dans 5 minutes. Ne le communiquez à personne.`,
+        body: sms('auth.otp', user.lang, { code }),
         ref: 'otp',
       });
     }
@@ -67,7 +80,8 @@ export class AuthService {
       await this.outbox.send({
         channel: 'SMS',
         to: phone,
-        body: "Ganji : nouvelle connexion à votre compte. Si ce n'est pas vous, appelez le relais de votre commune.",
+        lang: user.lang,
+        body: sms('auth.newLogin', user.lang),
         ref: 'login-alert',
       });
     }
@@ -80,18 +94,22 @@ export class AuthService {
     const existing = await this.prisma.user.findFirst({ where: { OR: [{ phone }, { npiHash }] } });
     if (existing) throw new BadRequestException('Un compte existe déjà pour ce NPI ou ce numéro. Connectez-vous.');
     const commune = dto.commune ? await this.prisma.commune.findUnique({ where: { name: dto.commune } }) : null;
+    if (dto.commune && !commune) throw new BadRequestException('Commune inconnue : choisissez-la dans la liste.');
+    const birthDate = new Date(dto.birthDate);
+    if (Number.isNaN(birthDate.getTime()) || birthDate > new Date() || birthDate.getFullYear() < 1900) throw new BadRequestException('Date de naissance invalide');
     await this.prisma.user.create({
       data: {
         role: 'PATIENT',
-        displayName: `${dto.firstName} ${dto.lastName}`,
+        displayName: `${dto.firstName.trim()} ${dto.lastName.trim()}`,
         phone,
+        lang: dto.lang ? toLang(dto.lang as UiLang) : 'fr',
         npiHash,
         npiLast4: dto.npi.slice(-4),
         patient: {
           create: {
-            firstName: dto.firstName,
-            lastName: dto.lastName,
-            birthDate: new Date(dto.birthDate),
+            firstName: dto.firstName.trim(),
+            lastName: dto.lastName.trim(),
+            birthDate,
             sex: dto.sex,
             communeId: commune?.id,
           },
@@ -158,9 +176,12 @@ export class AuthService {
       where: { caregiverId: auth.id, revokedAt: null },
       select: { relation: true, scopes: true, patient: { select: { id: true, firstName: true, lastName: true } } },
     });
+    // Accueil après inscription : le carnet n'a pas encore été rempli une première fois.
+    const own = auth.patientId ? await this.prisma.patient.findUnique({ where: { id: auth.patientId }, select: { profileDoneAt: true } }) : null;
     return {
       ...user,
       phone: user.phone ? `${user.phone.slice(0, 4)}••••${user.phone.slice(-2)}` : null,
+      profileDone: own ? own.profileDoneAt !== null : true,
       patientId: auth.patientId,
       practitioner,
       facilityId: auth.facilityId,
