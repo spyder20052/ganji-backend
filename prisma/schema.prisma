@@ -802,3 +802,13 @@ model DemoMeta {
   key   String @id
   value String
 }
+
+/// Voix de synthèse en langue nationale (MMS-TTS) : chaque texte lu une fois est gardé (MP3), relu aussitôt ensuite.
+model TtsClip {
+  key       String   @id // sha256(langue + texte)
+  lang      String
+  chars     Int
+  mime      String
+  data      Bytes
+  createdAt DateTime @default(now())
+}

@@ -17,6 +17,7 @@ import { MaternalModule } from './maternal/maternal.module';
 import { MedicationsModule } from './medications/medications.module';
 import { PatientsModule } from './patients/patients.module';
 import { PrismaModule } from './prisma/prisma.service';
+import { TtsModule } from './tts/tts.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ProfileModule } from './profile/profile.module';
 import { AppointmentsModule } from './appointments/appointments.module';
@@ -66,6 +67,7 @@ function jwtSecret(): string {
     RightsModule,
     AssistantModule,
     CircleModule,
+    TtsModule,
   ],
   controllers: [HealthController],
   providers: [
