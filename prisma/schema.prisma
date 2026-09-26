@@ -795,3 +795,10 @@ model RelayVisit {
 
   @@index([communeId, status])
 }
+
+/// Métadonnées de la démo (ex. version du jeu de données) : le seed de déploiement remet la démo à jour
+/// quand la version enregistrée diffère de celle du code.
+model DemoMeta {
+  key   String @id
+  value String
+}

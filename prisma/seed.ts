@@ -17,8 +17,11 @@ import { prescriptionSignedString } from '../src/medications/medications.service
 
 import { seedExtensions } from './seed-ext';
 
-/** Persona créée par la version actuelle des données de démo : sa présence signifie « base à jour ». */
-const SEED_MARK = 'ecoutante';
+/**
+ * Version du jeu de données de démo : à changer à chaque modification des données (seed ou seed-ext).
+ * Au déploiement (--if-empty), une base d'une autre version est remise à jour automatiquement.
+ */
+const SEED_VERSION = '2026-09-26.2';
 
 const prisma = new PrismaClient();
 loadDotEnv();
@@ -118,10 +121,10 @@ async function reset() {
 
 async function main() {
   // DEMO_RESET=true (variable posée le temps d'un déploiement) : remet la démo à l'état initial.
-  // Base déjà initialisée avec le jeu de données actuel (repère : la persona ajoutée par la dernière version
-  // des données, l'écoutante) : rien à faire. Base d'une version antérieure : on la remet à jour.
+  // Base déjà initialisée avec la version actuelle des données : rien à faire. Autre version : on la remet à jour.
   if (process.argv.includes('--if-empty') && process.env.DEMO_RESET !== 'true' && (await prisma.department.count()) > 0) {
-    if (await prisma.user.findUnique({ where: { demoPersona: SEED_MARK } })) {
+    const stored = await prisma.demoMeta.findUnique({ where: { key: 'seedVersion' } }).catch(() => null);
+    if (stored?.value === SEED_VERSION) {
       console.log('Base déjà initialisée : seed ignoré.');
       return;
     }
@@ -541,6 +544,8 @@ async function main() {
 
   // ─── 14. Fonctions ajoutées : profil, rendez-vous, sang, commandes, écoute, droits, assistant, cercle ───
   await seedExtensions({ prisma, users, communeId, daysAgo, inDays, at });
+
+  await prisma.demoMeta.upsert({ where: { key: 'seedVersion' }, update: { value: SEED_VERSION }, create: { key: 'seedVersion', value: SEED_VERSION } });
 
   console.timeEnd('seed');
   console.log(`Seed terminé : ${await prisma.facility.count()} établissements, ${await prisma.patient.count()} patients, ${await prisma.donor.count()} donneurs.`);
