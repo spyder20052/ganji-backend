@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Lang } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { smsSafe } from './gsm';
 
 export type Channel = 'SMS' | 'VOICE' | 'PUSH';
 
@@ -35,7 +36,8 @@ export class OutboxService {
       data: {
         channel: msg.channel,
         to: msg.to,
-        body: msg.body,
+        // SMS en langue nationale : sans lettres spéciales ni tons (voir gsm.ts) ; voix et notifications : tel quel.
+        body: msg.channel === 'SMS' ? smsSafe(msg.body, msg.lang) : msg.body,
         lang: msg.lang ?? 'fr',
         audioKey: msg.audioKey,
         ref: msg.ref,

@@ -1,22 +1,34 @@
 import type { Lang } from '@prisma/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { preferredText, when } from '../src/appointments/appointments.logic';
 import { NotificationsService } from '../src/common/notifications.service';
 import { OutboxService } from '../src/common/outbox.service';
 import { FON } from '../src/common/i18n/fon';
 import { YORUBA } from '../src/common/i18n/yoruba';
+import { BARIBA } from '../src/common/i18n/bariba';
+import { DENDI } from '../src/common/i18n/dendi';
 import { fill, localeOf, longDateTime, note, plural, pluralOf, SMS, sms, textLang, translate, type Entry, type TextKey } from '../src/common/i18n';
 import { checkCatalog, checkNational, placeholders } from '../scripts/i18n/check';
 
 const KEY = 'auth.otp' satisfies TextKey;
 
+/**
+ * Les tests simulent « pas encore traduit » puis « traduit » sur quelques clés : on retire ces clés des
+ * fichiers nationaux (déjà traduits) avant chaque test et on les remet après, pour rester valables
+ * quel que soit l'avancement des traductions.
+ */
+const TOUCHED = [KEY, 'rdv.confirmed', 'date.at', 'blood.n.reserved.title.one', 'blood.n.reserved.title.other'];
+const NATIONAL_FILES = [FON, YORUBA, BARIBA, DENDI];
+let saved: Record<string, string>[] = [];
+beforeEach(() => {
+  saved = NATIONAL_FILES.map((d) => Object.fromEntries(TOUCHED.filter((k) => k in d).map((k) => [k, d[k]])));
+  for (const d of NATIONAL_FILES) for (const k of TOUCHED) delete d[k];
+});
 afterEach(() => {
-  delete FON[KEY];
-  delete YORUBA[KEY];
-  delete YORUBA['rdv.confirmed'];
-  delete YORUBA['date.at'];
-  delete YORUBA['blood.n.reserved.title.one'];
-  delete YORUBA['blood.n.reserved.title.other'];
+  NATIONAL_FILES.forEach((d, i) => {
+    for (const k of TOUCHED) delete d[k];
+    Object.assign(d, saved[i]);
+  });
 });
 
 describe('sms() : langue de la personne, puis langue nationale, puis français', () => {
@@ -188,7 +200,8 @@ describe('notifications : chacun dans sa langue', () => {
     expect(created.map((c) => [c.userId, c.title])).toEqual([
       ['a', 'Commande acceptée'],
       ['b', 'Order accepted'],
-      ['c', 'Commande acceptée'],
+      // Fon : le titre traduit (ou le français tant qu'il ne l'est pas).
+      ['c', FON['order.n.accepted.title'] || 'Commande acceptée'],
     ]);
     expect(created[1].body).toBe('Pharmacie Camp Guézo is preparing your order CMD-1.');
     expect(sent.map((m) => [m.to, m.lang])).toEqual([

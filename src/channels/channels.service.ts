@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Lang } from '@prisma/client';
 import { BloodService } from '../blood/blood.service';
 import { OutboxService } from '../common/outbox.service';
+import { smsSafe } from '../common/gsm';
 import { shortDateTime, sms, type TextKey, type Vars } from '../common/i18n';
 import { TickRegistry } from '../common/tick.registry';
 import { normalizePhone } from '../auth/auth.dto';
@@ -137,6 +138,12 @@ export class ChannelsService {
   async ussd(rawFrom: string, input: string) {
     const from = normalizePhone(rawFrom);
     const lang = await this.langOf(from);
+    // Écrans USSD en langue nationale : sans lettres spéciales ni tons, comme les SMS (voir common/gsm.ts).
+    const r = await this.ussdScreen(from, lang, input);
+    return { ...r, text: smsSafe(r.text, lang) };
+  }
+
+  private async ussdScreen(from: string, lang: Lang, input: string) {
     const steps = input.split('*').filter(Boolean);
     const menu = `CON ${sms('ussd.menu', lang)}`;
     if (steps.length === 0) return { text: menu };
