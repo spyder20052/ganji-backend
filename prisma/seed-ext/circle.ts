@@ -47,7 +47,7 @@ export async function seedCircle(ctx: SeedCtx) {
 
   const now = Date.now();
   const ago = (h: number) => new Date(now - h * HOUR);
-  const title = 'Prise du traitement';
+  const title = 'Prise : Imatinib';
   await prisma.reminder.createMany({
     data: [
       { id: ID.koffiYesterday, patientId: koffi.id, kind: 'MEDICATION', title, dueAt: ago(27), sentAt: ago(27), channels: ['APP', 'SMS'], escalation: 2 },

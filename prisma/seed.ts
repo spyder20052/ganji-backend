@@ -21,7 +21,7 @@ import { seedExtensions } from './seed-ext';
  * Version du jeu de données de démo : à changer à chaque modification des données (seed ou seed-ext).
  * Au déploiement (--if-empty), une base d'une autre version est remise à jour automatiquement.
  */
-const SEED_VERSION = '2026-09-26.2';
+const SEED_VERSION = '2026-09-26.3';
 
 const prisma = new PrismaClient();
 loadDotEnv();
@@ -307,7 +307,7 @@ async function main() {
   });
   await prisma.reminder.createMany({
     data: [
-      { patientId: koffi.id, kind: 'MEDICATION', title: 'Prise du traitement du soir', dueAt: at(0.4, 20), channels: ['APP', 'SMS'] },
+      { patientId: koffi.id, kind: 'MEDICATION', title: 'Prise : Imatinib', dueAt: at(0.4, 20), channels: ['APP', 'SMS'] },
       { patientId: koffi.id, kind: 'LAB', title: 'Prise de sang (NFS)', place: 'Laboratoire CNHU-HKM', dueAt: at(3, 8), channels: ['APP', 'SMS'] },
       { patientId: koffi.id, kind: 'APPOINTMENT', title: 'Consultation hématologie', place: 'CNHU-HKM, Cotonou', dueAt: at(6, 10), channels: ['APP', 'SMS', 'VOICE'] },
     ],
