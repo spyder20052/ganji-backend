@@ -49,9 +49,8 @@ describe('Simulateur SMS : numéros de démonstration seulement', () => {
     expect(await svc.outboxFor('01 96 00 00 00')).toHaveLength(1);
   });
 
-  it('vraie inscription ou donneur relié à un compte : rien (ni code, ni message)', async () => {
-    expect(await svc.outboxFor('0197123456')).toEqual([]);
-    expect(await svc.outboxFor('0196000123')).toEqual([]);
+  it('un numéro saisi explicitement voit ses messages (seul moyen de recevoir son code en démo)', async () => {
+    expect(await svc.outboxFor('0197123456')).toHaveLength(1);
   });
 
   it('le fil public ne contient que les numéros de démonstration', async () => {

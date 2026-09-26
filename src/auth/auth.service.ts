@@ -48,7 +48,9 @@ export class AuthService {
         ref: 'otp',
       });
     }
-    return { sent: true, expiresInSeconds: OTP_TTL_MS / 1000, simulator: this.demoMode };
+    // Hors démo, la réponse ne dit jamais si le numéro a un compte (pas d'énumération). En démo, on le dit :
+    // sinon une personne dont le compte a été effacé par une remise à zéro attend un code qui ne viendra pas.
+    return { sent: Boolean(user) || !this.demoMode, expiresInSeconds: OTP_TTL_MS / 1000, simulator: this.demoMode, ...(this.demoMode ? { account: Boolean(user) } : {}) };
   }
 
   async verifyOtp(rawPhone: string, code: string, ip?: string) {
