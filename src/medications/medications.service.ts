@@ -215,6 +215,16 @@ export class MedicationsService {
     const now = new Date();
     const pharmacyName = pharmacy.shortName ?? pharmacy.name;
 
+    // Ordonnance commandée en ligne (livraison ou retrait, module orders) : elle se délivre par sa commande.
+    const ordered = await this.prisma.order.findFirst({
+      where: { prescriptionId: rx.id, status: { in: ['RECUE', 'ACCEPTEE', 'PRETE', 'EN_LIVRAISON'] } },
+      select: { pharmacyName: true },
+    });
+    if (ordered) {
+      await this.audit.log({ actor: user, patientId: rx.patientId, action: 'DENIED', resource: 'Délivrance d’ordonnance', reason: `Commande en cours chez ${ordered.pharmacyName}`, allowed: false, ip });
+      throw new ConflictException(`Ordonnance commandée chez ${ordered.pharmacyName} (commande en cours) : elle se délivre avec cette commande, pas au comptoir.`);
+    }
+
     const dispensed = await this.prisma.$transaction(async (tx) => {
       // Garde atomique : une seule délivrance possible, même en cas de double scan simultané.
       const { count } = await tx.prescription.updateMany({
