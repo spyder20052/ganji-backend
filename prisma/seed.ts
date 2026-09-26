@@ -17,6 +17,9 @@ import { prescriptionSignedString } from '../src/medications/medications.service
 
 import { seedExtensions } from './seed-ext';
 
+/** Persona créée par la version actuelle des données de démo : sa présence signifie « base à jour ». */
+const SEED_MARK = 'ecoutante';
+
 const prisma = new PrismaClient();
 loadDotEnv();
 const crypto = new CryptoService();
@@ -115,9 +118,14 @@ async function reset() {
 
 async function main() {
   // DEMO_RESET=true (variable posée le temps d'un déploiement) : remet la démo à l'état initial.
+  // Base déjà initialisée avec le jeu de données actuel (repère : la persona ajoutée par la dernière version
+  // des données, l'écoutante) : rien à faire. Base d'une version antérieure : on la remet à jour.
   if (process.argv.includes('--if-empty') && process.env.DEMO_RESET !== 'true' && (await prisma.department.count()) > 0) {
-    console.log('Base déjà initialisée : seed ignoré.');
-    return;
+    if (await prisma.user.findUnique({ where: { demoPersona: SEED_MARK } })) {
+      console.log('Base déjà initialisée : seed ignoré.');
+      return;
+    }
+    console.log('Jeu de données d’une version antérieure : réinitialisation de la démo.');
   }
   console.time('seed');
   await reset();

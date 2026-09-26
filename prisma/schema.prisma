@@ -388,21 +388,23 @@ model BloodStock {
 
 /// FHIR ServiceRequest
 model BloodRequest {
-  id            String       @id @default(uuid())
-  patientId     String
-  patient       Patient      @relation(fields: [patientId], references: [id])
-  requesterId   String
-  requesterName String
-  facilityId    String
-  facility      Facility     @relation(fields: [facilityId], references: [id])
-  product       String
-  bloodGroup    String
-  quantity      Int
-  urgency       String // VITALE | URGENTE | PROGRAMMEE
-  neededBy      DateTime
-  status        String       @default("OUVERTE") // OUVERTE | DONNEURS_ALERTES | DONNEUR_TROUVE | SERVIE | ANNULEE
-  createdAt     DateTime     @default(now())
-  alerts        DonorAlert[]
+  id             String       @id @default(uuid())
+  patientId      String
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  requesterId    String
+  requesterName  String
+  facilityId     String
+  facility       Facility     @relation(fields: [facilityId], references: [id])
+  product        String
+  bloodGroup     String
+  quantity       Int
+  urgency        String // VITALE | URGENTE | PROGRAMMEE
+  neededBy       DateTime
+  status         String       @default("OUVERTE") // OUVERTE | DONNEURS_ALERTES | DONNEUR_TROUVE | POCHES_RESERVEES | SERVIE | ANNULEE
+  reservedUnits  Int          @default(0) // poches mises de côté par la banque de sang (déjà retirées de son stock)
+  reservedSiteId String? // site de transfusion qui a réservé
+  createdAt      DateTime     @default(now())
+  alerts         DonorAlert[]
 }
 
 model Donor {
@@ -674,10 +676,11 @@ model Order {
   instructions    String?
   payment         String // ESPECES | MOBILE_MONEY
   paymentStatus   String   @default("A_PAYER") // A_PAYER | PAYE
-  status          String   @default("RECUE") // RECUE | ACCEPTEE | PRETE | EN_LIVRAISON | LIVREE | RETIREE | REFUSEE | ANNULEE
+  status          String   @default("RECUE") // RECUE | ACCEPTEE | PRETE | EN_LIVRAISON | LIVREE | RETIREE | REFUSEE | ANNULEE | ECHEC
   courierName     String?
   courierPhone    String?
   handoverCode    String // code à 4 chiffres donné au livreur (ou au comptoir) à la remise
+  codeAttempts    Int      @default(0) // codes faux saisis depuis le dernier code émis (blocage à 5, compteur atomique)
   refusalReason   String?
   events          Json     @default("[]") // [{status, at, by}]
   createdAt       DateTime @default(now())
