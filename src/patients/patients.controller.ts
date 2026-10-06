@@ -1,8 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req, Res, StreamableFile } from '@nestjs/common';
 import { ApiOperation, ApiProduces, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import type { Request, Response } from 'express';
 import { AuthUser, CurrentUser, Roles } from '../common/auth-user';
-import { DelegationDto, DocumentDto, EncounterDto, ObservationDto, RedeemDto, ShareDto } from './patients.dto';
+import { DelegationDto, DiscreetDto, DocumentDto, EncounterDto, ObservationDto, RedeemDto, ShareDto } from './patients.dto';
 import { PatientsService } from './patients.service';
 
 @ApiTags('M1 · Consentement')
@@ -38,8 +39,8 @@ export class MeController {
 
   @Post('discreet')
   @HttpCode(200)
-  discreet(@CurrentUser() u: AuthUser, @Body('on') on: boolean) {
-    return this.svc.setDiscreet(u, Boolean(on));
+  discreet(@CurrentUser() u: AuthUser, @Body() dto: DiscreetDto) {
+    return this.svc.setDiscreet(u, dto.on);
   }
 
   @Get('delegations')
@@ -64,8 +65,10 @@ export class PatientsController {
   constructor(private readonly svc: PatientsService) {}
 
   @Roles('PRACTITIONER', 'NURSE', 'PHARMACIST')
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
   @Post('share/redeem')
   @HttpCode(200)
+  @ApiOperation({ summary: 'Ouvre un carnet partagé par QR ou code à 6 chiffres (10 essais par minute, 10 codes faux par quart d’heure)' })
   redeem(@CurrentUser() u: AuthUser, @Body() dto: RedeemDto, @Req() req: Request) {
     return this.svc.redeem(u, dto.token, req.ip);
   }
@@ -145,7 +148,8 @@ export class PatientsController {
   }
 
   @Get('patients/:id/access-log')
-  accessLog(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.svc.accessLog(u, id);
+  @ApiOperation({ summary: 'Journal d’accès d’un proche (parent, aidant délégué) ; jamais lisible par un soignant' })
+  accessLog(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Req() req: Request) {
+    return this.svc.accessLog(u, id, req.ip);
   }
 }

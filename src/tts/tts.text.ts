@@ -6,7 +6,6 @@ import yor from './vocab/yor.json';
 /** Voix disponibles (modèles MMS-TTS de Meta) et code du modèle pour chaque langue de l'application. */
 export const TTS_MODELS = { fon: 'fon', yoruba: 'yor', bariba: 'bba', dendi: 'ddn' } as const;
 export type TtsLang = keyof typeof TTS_MODELS;
-export const isTtsLang = (v: unknown): v is TtsLang => typeof v === 'string' && v in TTS_MODELS;
 
 interface VocabFile {
   vocab: Record<string, number>;

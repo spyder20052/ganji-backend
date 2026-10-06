@@ -7,6 +7,8 @@
  * Heures de référence (heure de Cotonou) : matin 8 h, midi 13 h, soir 20 h, coucher 22 h.
  */
 
+import { atBeninTime, beninDateKey, DAY_MS, startOfBeninDay } from '../common/time';
+
 export type Slot = 'MATIN' | 'MIDI' | 'SOIR' | 'COUCHER';
 export type Meal = 'AVANT' | 'PENDANT' | 'APRES' | 'A_JEUN';
 
@@ -175,27 +177,11 @@ export function parseDosage(dosage: string, duration?: string | null): DosagePla
   return { ...base, times: [], perDay: 0, everyDays, asNeeded: false, understood: false };
 }
 
-// ─── Calendrier (heure de Cotonou, UTC+1 toute l'année) ───────────────
+// ─── Calendrier (heure de Cotonou, UTC+1 toute l'année : common/time.ts) ───
 
-const COTONOU_OFFSET_MS = 3600_000;
-const DAY_MS = 86_400_000;
-
-/** Minuit (heure de Cotonou) du jour de `d`. */
-export function startOfCotonouDay(d: Date): Date {
-  const local = new Date(d.getTime() + COTONOU_OFFSET_MS);
-  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - COTONOU_OFFSET_MS);
-}
-
-/** Date du jour à Cotonou, « AAAA-MM-JJ ». */
-export function cotonouDateKey(d: Date): string {
-  return new Date(d.getTime() + COTONOU_OFFSET_MS).toISOString().slice(0, 10);
-}
-
-/** Instant correspondant à « HH:MM » à Cotonou, le jour qui commence à `dayStart`. */
-export function atCotonou(dayStart: Date, time: string): Date {
-  const [h, m] = time.split(':').map(Number);
-  return new Date(dayStart.getTime() + (h * 60 + m) * 60_000);
-}
+export const startOfCotonouDay = startOfBeninDay;
+export const cotonouDateKey = beninDateKey;
+export const atCotonou = atBeninTime;
 
 /**
  * Instants de prise entre `from` et `until` (inclus), jour après jour, en respectant « un jour sur N »

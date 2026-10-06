@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Lang } from '@prisma/client';
+import { DONOR_ALERT_TTL_MS } from '../blood/blood.logic';
 import { BloodService } from '../blood/blood.service';
+import { CryptoService } from '../common/crypto.service';
 import { OutboxService } from '../common/outbox.service';
 import { smsSafe } from '../common/gsm';
 import { shortDateTime, sms, type TextKey, type Vars } from '../common/i18n';
@@ -19,9 +21,17 @@ const DEMO_HORIZON_HOURS = 48;
 /** Rappels traités par lot, et temps maximal consacré à l'envoi par passage de la tâche planifiée. */
 export const TICK_BATCH = 200;
 export const TICK_BUDGET_MS = 20_000;
+/**
+ * Un rappel part jusqu'à une heure après son heure ; au-delà, il est passé : la tâche le marque « sauté »
+ * (créé entre deux passages, réseau coupé…) plutôt que de le laisser indéfiniment dans la file ou d'envoyer
+ * « demain 9 h » le surlendemain.
+ */
+export const REMINDER_LATE_GRACE_MS = 3600_000;
 
 /** Rappels, par type : le texte donne toujours le jour et l'heure (la tâche planifiée part en avance). */
 const REMINDER_KEY: Record<string, TextKey> = { CPN: 'rappel.cpn', VACCINE: 'rappel.vaccin', MEDICATION: 'rappel.prise', LAB: 'rappel.analyse' };
+/** Message vocal pré-enregistré joint au rappel (clés de src/data/health-content.ts) ; les autres types n'en ont pas. */
+const REMINDER_AUDIO: Record<string, string> = { CPN: 'reminder.cpn', VACCINE: 'reminder.vaccine', MEDICATION: 'reminder.medication' };
 
 /**
  * Canaux sans smartphone : SMS entrants, menu USSD et tâches planifiées.
@@ -36,6 +46,7 @@ export class ChannelsService {
     private readonly alerts: AlertsService,
     private readonly ticks: TickRegistry,
     private readonly circle: CircleService,
+    private readonly crypto: CryptoService,
   ) {}
 
   /**
@@ -58,12 +69,23 @@ export class ChannelsService {
   }
 
   /**
-   * Messages d'un numéro saisi explicitement (démo uniquement : le simulateur tient lieu d'agrégateur SMS,
-   * c'est le seul moyen de recevoir son code après une inscription). Seul le fil public reste limité aux
-   * numéros de démonstration.
+   * Le simulateur tient lieu de téléphone (démo). Il n'affiche les messages d'un numéro, et ne parle en son
+   * nom, que pour les téléphones de démonstration (personas, donneurs simulés) ou, avec la clé remise à
+   * l'inscription, pour le carnet créé depuis ce navigateur. Sans cela, le code de connexion d'une vraie
+   * inscription serait lisible par quiconque connaît le numéro. Numéro inconnu, clé absente ou fausse :
+   * même réponse (pas d'énumération).
    */
-  async outboxFor(rawPhone: string) {
-    const to = normalizePhone(rawPhone);
+  async assertSimulatorPhone(rawPhone: string, key?: string): Promise<string> {
+    const phone = normalizePhone(rawPhone);
+    if ((await this.simulatorPhones([phone])).has(phone)) return phone;
+    const user = key ? await this.prisma.user.findUnique({ where: { phone }, select: { id: true } }) : null;
+    if (user && key && this.crypto.safeEqual(key, this.crypto.simulatorKey(user.id))) return phone;
+    throw new NotFoundException('Numéro inconnu du simulateur : seuls les téléphones de démonstration et le carnet créé depuis ce navigateur sont visibles.');
+  }
+
+  /** Messages reçus par un numéro (démo) : voir assertSimulatorPhone. */
+  async outboxFor(rawPhone: string, key?: string) {
+    const to = await this.assertSimulatorPhone(rawPhone, key);
     return this.prisma.outbox.findMany({ where: { to }, orderBy: { createdAt: 'desc' }, take: 40 });
   }
 
@@ -106,8 +128,9 @@ export class ChannelsService {
         : null;
       if (alert) {
         const accept = /^(1|OUI|YES)$/.test(text);
-        await this.blood.respond(alert.id, accept, 'SMS');
-        handled = accept ? 'DON_ACCEPTE' : 'DON_REFUSE';
+        const r = await this.blood.respond(alert.id, accept, 'SMS');
+        // Le statut réellement rendu : un « 1 » tardif sur un besoin déjà couvert n'est pas un don accepté.
+        handled = r.status === 'ACCEPTEE' ? 'DON_ACCEPTE' : r.status === 'REFUSEE' ? 'DON_REFUSE' : 'DON_EXPIRE';
       } else {
         const reminder = await this.pendingReminder(from);
         if (reminder && /^(1|OUI|YES)$/.test(text)) {
@@ -236,7 +259,7 @@ export class ChannelsService {
     for (const r of stale) {
       const next = new Date(r.dueAt);
       while (next.getTime() < now + 3600_000) next.setUTCDate(next.getUTCDate() + 1);
-      await this.prisma.reminder.update({ where: { id: r.id }, data: { dueAt: next, sentAt: null, confirmedAt: null } });
+      await this.prisma.reminder.update({ where: { id: r.id }, data: { dueAt: next, sentAt: null, skippedAt: null, confirmedAt: null } });
     }
     return this.tick({ horizonHours: Math.max(horizonHours, DEMO_HORIZON_HOURS) });
   }
@@ -249,12 +272,17 @@ export class ChannelsService {
     const horizon = new Date(Date.now() + (opts.horizonHours ?? 24) * 3600_000);
     const started = Date.now();
     let sent = 0;
+    // Rappels passés sans avoir été envoyés : sortis de la file et comptés, jamais perdus en silence.
+    const skipped = await this.prisma.reminder.updateMany({
+      where: { sentAt: null, skippedAt: null, dueAt: { lt: new Date(started - REMINDER_LATE_GRACE_MS) } },
+      data: { skippedAt: new Date(started) },
+    });
     // Par lots de 200 jusqu'à épuisement (plans de prises, campagnes de vaccination…), borné dans le temps :
     // une fonction serverless ne doit pas dépasser son délai ; le reste part au passage suivant.
     for (;;) {
       if (Date.now() - started > TICK_BUDGET_MS) break;
       const due = await this.prisma.reminder.findMany({
-        where: { sentAt: null, dueAt: { lte: horizon, gte: new Date(Date.now() - 3600_000) } },
+        where: { sentAt: null, skippedAt: null, dueAt: { lte: horizon, gte: new Date(Date.now() - REMINDER_LATE_GRACE_MS) } },
         include: { patient: { include: { user: true, delegations: { where: { revokedAt: null }, include: { caregiver: true } } } } },
         orderBy: { dueAt: 'asc' },
         take: TICK_BATCH,
@@ -267,9 +295,10 @@ export class ChannelsService {
         );
         for (const u of recipients) {
           const text = this.reminderText(r.kind, r.dueAt, r.place, r.patient.firstName, r.patient.discreetMode, u.lang);
-          if (r.channels.includes('SMS')) await this.outbox.send({ channel: 'SMS', to: u.phone!, lang: u.lang, body: text, ref: `reminder:${r.id}`, audioKey: `reminder.${r.kind.toLowerCase()}` });
+          const audioKey = REMINDER_AUDIO[r.kind];
+          if (r.channels.includes('SMS')) await this.outbox.send({ channel: 'SMS', to: u.phone!, lang: u.lang, body: text, ref: `reminder:${r.id}`, audioKey });
           if (r.channels.includes('VOICE')) {
-            await this.outbox.send({ channel: 'VOICE', to: u.phone!, lang: u.lang, body: sms('voice.message', u.lang, { lang: u.lang, text }), ref: `reminder:${r.id}`, audioKey: `reminder.${r.kind.toLowerCase()}` });
+            await this.outbox.send({ channel: 'VOICE', to: u.phone!, lang: u.lang, body: sms('voice.message', u.lang, { lang: u.lang, text }), ref: `reminder:${r.id}`, audioKey });
           }
           if (r.channels.includes('APP')) await this.outbox.send({ channel: 'PUSH', to: u.phone!, lang: u.lang, body: text, ref: `reminder:${r.id}` });
         }
@@ -279,13 +308,13 @@ export class ChannelsService {
       if (due.length < TICK_BATCH) break;
     }
     const expired = await this.prisma.donorAlert.updateMany({
-      where: { status: 'ENVOYEE', createdAt: { lt: new Date(Date.now() - 48 * 3600_000) } },
+      where: { status: 'ENVOYEE', createdAt: { lt: new Date(Date.now() - DONOR_ALERT_TTL_MS) } },
       data: { status: 'EXPIREE' },
     });
     const clusters = await this.alerts.detectClusters();
     // Tâches des autres modules (rendez-vous, relances du cercle de soins, commandes…).
     const modules = await this.ticks.runAll();
-    return { remindersSent: sent, donorAlertsExpired: expired.count, clusterAlerts: clusters.created, ...modules };
+    return { remindersSent: sent, remindersSkipped: skipped.count, donorAlertsExpired: expired.count, clusterAlerts: clusters.created, ...modules };
   }
 
   private reminderText(kind: string, dueAt: Date, place: string | null, firstName: string, discreet: boolean, lang: Lang) {
@@ -294,8 +323,4 @@ export class ChannelsService {
     return sms(REMINDER_KEY[kind] ?? 'rappel.rdv', lang, vars);
   }
 
-  async assertPhoneKnown(phone: string) {
-    const u = await this.prisma.user.findUnique({ where: { phone: normalizePhone(phone) } });
-    if (!u) throw new NotFoundException();
-  }
 }

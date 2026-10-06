@@ -7,53 +7,18 @@ import { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { distanceKm } from '../common/geo';
 import { sms } from '../common/i18n';
+import { shortName } from '../common/names';
 import { OutboxService } from '../common/outbox.service';
+import { fmtDateTimeFr } from '../common/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePrescriptionDto, PharmacyStockDto } from './medications.dto';
+import { PRESCRIPTION_STATUS_LABEL as STATUS_LABEL, prescriptionSignedString, prescriptionStatus, RX_PAYLOAD, type PrescriptionItem } from './medications.logic';
 
-/** Ligne d'ordonnance telle que stockée (JSON) et signée. */
-export type PrescriptionItem = {
-  medicationId: string;
-  dci: string;
-  form: string;
-  strength: string;
-  dosage: string;
-  duration: string;
-  quantity: number;
-};
-
-export type PrescriptionStatus = 'ACTIVE' | 'DISPENSED' | 'EXPIRED' | 'CANCELLED';
-
-const STATUS_LABEL: Record<PrescriptionStatus, string> = {
-  ACTIVE: 'Valide',
-  DISPENSED: 'Délivrée',
-  EXPIRED: 'Expirée',
-  CANCELLED: 'Annulée',
-};
+export { prescriptionSignedString, type PrescriptionItem, type PrescriptionStatus } from './medications.logic';
 
 /** En dessous de ce seuil, le public voit « stock faible » (jamais le nombre exact). */
 const LOW_STOCK = 5;
 const DEFAULT_VALIDITY_DAYS = 30;
-const RX_PAYLOAD = /^(?:ganji:rx:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{16,64})$/i;
-
-/**
- * Chaîne signée d'une ordonnance. Les lignes sont sérialisées dans un ordre de
- * champs fixe : PostgreSQL (jsonb) ne conserve pas l'ordre des clés, un simple
- * JSON.stringify de la valeur relue ne redonnerait pas la chaîne signée.
- * À réutiliser tel quel par tout code qui crée des ordonnances (jeu de données de démo compris).
- */
-export function prescriptionSignedString(id: string, patientId: string, items: PrescriptionItem[]): string {
-  const canonical = items.map((i) => [i.medicationId, i.dci, i.form, i.strength, i.dosage, i.duration, i.quantity]);
-  return `${id}|${patientId}|${JSON.stringify(canonical)}`;
-}
-
-function fmtDate(d: Date) {
-  return d.toLocaleString('fr-FR', { timeZone: 'Africa/Porto-Novo', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
-function shortName(p: { firstName: string; lastName: string }) {
-  return `${p.firstName} ${p.lastName.charAt(0)}.`;
-}
 
 @Injectable()
 export class MedicationsService {
@@ -358,18 +323,16 @@ export class MedicationsService {
     return { rx: prescription, patient };
   }
 
-  private status(rx: Prescription, now = new Date()): PrescriptionStatus {
-    if (rx.status === 'DISPENSED') return 'DISPENSED';
-    if (rx.status === 'CANCELLED') return 'CANCELLED';
-    return rx.expiresAt <= now ? 'EXPIRED' : 'ACTIVE';
+  private status(rx: Prescription, now = new Date()) {
+    return prescriptionStatus(rx, now);
   }
 
   private refusal(rx: Prescription): string {
     switch (this.status(rx)) {
       case 'DISPENSED':
-        return `Ordonnance déjà délivrée le ${fmtDate(rx.dispensedAt ?? rx.issuedAt)} par ${rx.dispensedByName ?? 'une autre pharmacie'}. Elle ne peut pas resservir.`;
+        return `Ordonnance déjà délivrée le ${fmtDateTimeFr(rx.dispensedAt ?? rx.issuedAt)} par ${rx.dispensedByName ?? 'une autre pharmacie'}. Elle ne peut pas resservir.`;
       case 'EXPIRED':
-        return `Ordonnance expirée depuis le ${fmtDate(rx.expiresAt)}. Le patient doit consulter pour une nouvelle ordonnance.`;
+        return `Ordonnance expirée depuis le ${fmtDateTimeFr(rx.expiresAt)}. Le patient doit consulter pour une nouvelle ordonnance.`;
       case 'CANCELLED':
         return 'Ordonnance annulée par le prescripteur. Elle ne peut pas être délivrée.';
       default:

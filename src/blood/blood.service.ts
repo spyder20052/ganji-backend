@@ -6,10 +6,12 @@ import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { compatibleDonorGroups, distanceKm } from '../common/geo';
 import { NotificationsService } from '../common/notifications.service';
+import { shortName } from '../common/names';
 import { OutboxService } from '../common/outbox.service';
 import { note, plural, sms, text, type Var, type Vars } from '../common/i18n';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateBloodRequestDto, DonorProfileDto } from './blood.dto';
+import { donorChannel, FINAL_STATUSES, NEEDS_BLOOD, nextSlot, SERVABLE, wantsVoice } from './blood.logic';
 import { dayIn, PRODUCT_LABEL, productIn, urgencyIn, whenIn } from './blood.sms';
 import {
   ageOn, boundingBox, canDonateNow, type Contraindication, contraindicationOf, coverage, eligibility, MAX_AGE, MIN_AGE, NEARBY_KM, nextDonationDate, pickByRadius, planStockDraw, RADIUS_STEPS, REST_DAYS,
@@ -18,21 +20,11 @@ import {
 const MAX_ALERTS = 14;
 /** Stock « proche » d'un hôpital : sites de transfusion à moins de 60 km. */
 const STOCK_RADIUS_KM = 60;
-/** Demande encore à couvrir : on peut alerter des donneurs, réserver des poches, se proposer. */
-const NEEDS_BLOOD = ['OUVERTE', 'DONNEURS_ALERTES', 'DONNEUR_TROUVE'];
+/** Échéance par défaut d'une demande sans date : le lendemain à la même heure. */
+const DEFAULT_NEEDED_BY_MS = 24 * 3600_000;
+/** Une demande dont l'échéance est passée depuis plus de six heures n'est plus proposée aux donneurs. */
+const NEARBY_GRACE_MS = 6 * 3600_000;
 const URGENCY_RANK: Record<string, number> = { VITALE: 0, URGENTE: 1, PROGRAMMEE: 2 };
-
-/** Prochain créneau de collecte : demain 8 h, 9 h, 10 h… (heure de Cotonou, UTC+1). */
-function nextSlot(index: number, now = new Date()) {
-  const d = new Date(now);
-  d.setUTCDate(d.getUTCDate() + 1);
-  d.setUTCHours(7 + Math.min(index, 8), 0, 0, 0);
-  return d;
-}
-
-function donorChannel(d: Pick<Donor, 'hasSmartphone' | 'lang'>) {
-  return d.hasSmartphone ? 'APP' : d.lang !== 'fr' ? 'VOICE' : 'SMS';
-}
 
 const INELIGIBLE_MESSAGE: Record<string, string> = {
   TOO_YOUNG: 'Il faut avoir au moins 18 ans pour donner son sang.',
@@ -41,8 +33,6 @@ const INELIGIBLE_MESSAGE: Record<string, string> = {
   PREGNANCY: 'Pas de don de sang pendant la grossesse. Vos proches peuvent donner.',
   CONDITION: 'Votre santé ne permet pas le don pour le moment. Vos proches peuvent donner pour vous.',
 };
-/** Statuts d'une demande que l'on peut clore par « transfusion faite ». */
-const SERVABLE = ['OUVERTE', 'DONNEURS_ALERTES', 'DONNEUR_TROUVE', 'POCHES_RESERVEES'];
 /** Ce qu'il faut du carnet d'un donneur relié à un compte pour vérifier qu'il peut donner. */
 const DONOR_HEALTH = {
   user: { select: { patient: { select: { birthDate: true, conditions: { select: { code: true } }, pregnancies: { where: { status: 'EN_COURS' }, select: { id: true } } } } } },
@@ -85,7 +75,7 @@ export class BloodService {
   }
 
   async updateStock(user: AuthUser, siteId: string, product: string, bloodGroup: string, units: number) {
-    if (user.role !== 'BLOOD_BANK' || (user.facilityId && user.facilityId !== siteId)) {
+    if (user.role !== 'BLOOD_BANK' || !user.facilityId || user.facilityId !== siteId) {
       throw new ForbiddenException('Seul le site de transfusion concerné peut modifier son stock');
     }
     const row = await this.prisma.bloodStock.upsert({
@@ -138,7 +128,7 @@ export class BloodService {
         bloodGroup,
         quantity: dto.quantity,
         urgency: dto.urgency,
-        neededBy: dto.neededBy ? new Date(dto.neededBy) : new Date(Date.now() + 24 * 3600_000),
+        neededBy: dto.neededBy ? new Date(dto.neededBy) : new Date(Date.now() + DEFAULT_NEEDED_BY_MS),
       },
     });
     await this.audit.log({ actor: user, patientId: patient.id, action: 'WRITE', resource: `Demande ${dto.quantity} ${PRODUCT_LABEL[dto.product]} ${bloodGroup}`, ip });
@@ -203,7 +193,8 @@ export class BloodService {
       // Repos, âge et carnet (grossesse, maladie qui exclut le don) revérifiés à chaque appel.
       .filter((d) => canDonateNow(d.lastDonationAt, d.sex, d.user?.patient?.birthDate, contraindicationOf(d.user?.patient), now))
       .map((d) => ({ d, km: distanceKm(req.facility.lat, req.facility.lng, d.lat, d.lng) }));
-    const { chosen, radiusKm } = pickByRadius(eligible, MAX_ALERTS);
+    // On élargit le rayon tant qu'on n'a pas au moins deux donneurs par poche manquante (14 au plus).
+    const { chosen, radiusKm } = pickByRadius(eligible, MAX_ALERTS, RADIUS_STEPS, Math.min(MAX_ALERTS, Math.max(1, cov.missing) * 2));
 
     const place = placeOf(req.facility);
     const byChannel = { APP: 0, SMS: 0, VOICE: 0 };
@@ -220,7 +211,7 @@ export class BloodService {
         ref: `donor-alert:${alert.id}`,
         body: sms('blood.donor.call', d.lang, { name: d.firstName, group, place, km: Math.round(km) }),
       });
-      if (!d.hasSmartphone && d.lang !== 'fr') {
+      if (wantsVoice(d)) {
         await this.outbox.send({ channel: 'VOICE', to: d.phone, lang: d.lang, audioKey: 'donor.call', ref: `donor-alert:${alert.id}`, body: sms('blood.donor.voice', d.lang, { place }) });
       }
       if (d.userId) {
@@ -262,21 +253,25 @@ export class BloodService {
       return { status: 'REFUSEE' };
     }
 
-    const acceptedBefore = req.alerts.filter((a) => a.status === 'ACCEPTEE').length;
-    if (!NEEDS_BLOOD.includes(req.status) || coverage(req.quantity, acceptedBefore, req.reservedUnits).complete) {
+    // Couverture, réclamation et créneau dans une même transaction sérialisable : deux donneurs qui disent
+    // oui en même temps pour une seule poche ne sont pas tous deux acceptés (et déplacés pour rien).
+    const outcome = await this.serializable(async (tx) => {
+      const cur = await tx.bloodRequest.findUniqueOrThrow({ where: { id: req.id }, include: { alerts: { select: { id: true, status: true } } } });
+      const acceptedBefore = cur.alerts.filter((a) => a.status === 'ACCEPTEE' && a.id !== alert.id).length;
+      const covered = !NEEDS_BLOOD.includes(cur.status) || coverage(cur.quantity, acceptedBefore, cur.reservedUnits).complete;
+      const status = covered ? 'EXPIREE' : 'ACCEPTEE';
+      const appointment = covered ? null : nextSlot(acceptedBefore, cur.urgency, cur.neededBy);
+      const { count } = await tx.donorAlert.updateMany({ where: { id: alert.id, status: 'ENVOYEE' }, data: { status, respondedAt: new Date(), appointment } });
+      return count === 1 ? { status, appointment } : null;
+    });
+    if (!outcome) return already();
+    if (outcome.status === 'EXPIREE') {
       // Réponse tardive : le besoin est déjà couvert, on remercie sans faire déplacer la personne.
-      if ((await claim('EXPIREE')).count !== 1) return already();
       await this.outbox.send({ channel: 'SMS', to: alert.donor.phone, lang: alert.donor.lang, body: sms('blood.donor.covered', alert.donor.lang, { place }), ref: `donor-alert:${alert.id}` });
       return { status: 'EXPIREE', place };
     }
-
-    if ((await claim('ACCEPTEE')).count !== 1) return already();
-    // Créneau selon le rang réel parmi ceux qui ont dit oui (calculé après la réclamation).
-    const rank = await this.prisma.donorAlert.count({ where: { requestId: req.id, status: 'ACCEPTEE', id: { not: alert.id } } });
-    const appointment = nextSlot(rank);
-    await this.prisma.donorAlert.update({ where: { id: alert.id }, data: { appointment } });
-    await this.onDonorAccepted(req, alert.donor, alert.distanceKm, appointment, via, false);
-    return { status: 'ACCEPTEE', appointment, place };
+    await this.onDonorAccepted(req, alert.donor, alert.distanceKm, outcome.appointment!, via, false);
+    return { status: 'ACCEPTEE', appointment: outcome.appointment, place };
   }
 
   /**
@@ -337,6 +332,50 @@ export class BloodService {
     await this.notifyFamily(req, donor.userId);
     await this.audit.log({ patientId: req.patientId, action: 'DONOR_FOUND', resource: `Donneur ${donor.bloodGroup} à ${km} km (${volunteer ? 'proposition spontanée' : `réponse ${via}`})` });
     await this.closeIfCovered(req.id);
+  }
+
+  /**
+   * Demande annulée (erreur, patient transféré, besoin disparu) : par le prescripteur, un soignant de son
+   * établissement ou la banque de sang. Les donneurs encore attendus sont prévenus, les poches réservées
+   * reviennent au stock du site qui les avait mises de côté.
+   */
+  async cancel(user: AuthUser, id: string, reason: string | undefined, ip?: string) {
+    const r = await this.prisma.bloodRequest.findUnique({ where: { id }, include: { facility: true, alerts: { include: { donor: true } } } });
+    if (!r) throw new NotFoundException('Demande introuvable');
+    const sameFacility = CLINICAL_ROLES.includes(user.role) && Boolean(user.facilityId) && user.facilityId === r.facilityId;
+    if (r.requesterId !== user.id && !sameFacility && user.role !== 'BLOOD_BANK') {
+      throw new ForbiddenException('Réservé au prescripteur, aux soignants de son établissement et à la banque de sang');
+    }
+    if (r.status === 'ANNULEE') return { ok: true, already: true };
+    if (r.status === 'SERVIE') throw new BadRequestException('La transfusion a déjà été faite : la demande ne peut plus être annulée.');
+    const place = placeOf(r.facility);
+    const cancelled = await this.prisma.$transaction(async (tx) => {
+      const claim = await tx.bloodRequest.updateMany({ where: { id, status: { in: SERVABLE } }, data: { status: 'ANNULEE' } });
+      if (claim.count !== 1) return false;
+      await tx.donorAlert.updateMany({ where: { requestId: id, status: { in: ['ENVOYEE', 'ACCEPTEE'] } }, data: { status: 'EXPIREE' } });
+      if (r.reservedUnits > 0 && r.reservedSiteId) {
+        // Les poches réservées étaient sorties du stock : elles y retournent (sur le groupe du receveur).
+        await tx.bloodStock.upsert({
+          where: { siteId_product_bloodGroup: { siteId: r.reservedSiteId, product: r.product, bloodGroup: r.bloodGroup } },
+          update: { units: { increment: r.reservedUnits } },
+          create: { siteId: r.reservedSiteId, product: r.product, bloodGroup: r.bloodGroup, units: r.reservedUnits },
+        });
+      }
+      return true;
+    });
+    if (!cancelled) return { ok: true, already: true };
+    const waiting = r.alerts.filter((a) => a.status === 'ENVOYEE' || a.status === 'ACCEPTEE');
+    for (const a of waiting) {
+      await this.outbox.send({ channel: 'SMS', to: a.donor.phone, lang: a.donor.lang, body: sms('blood.donor.cancelled', a.donor.lang, { name: a.donor.firstName, place }), ref: `donor-alert:${a.id}` });
+      if (a.donor.userId) await this.notifications.notify(a.donor.userId, { kind: 'SANG', text: note('blood.n.cancelled.title', 'blood.n.cancelled.body', { place }), href: '/app/sang' });
+    }
+    await this.notifications.notify(await this.notifications.usersWithRole('BLOOD_BANK'), {
+      kind: 'SANG',
+      text: note('blood.n.cancelled.ants.title', 'blood.n.cancelled.ants.body', { place, group: r.bloodGroup, product: (l) => productIn(r.product, l) }),
+      href: `/ants#demande-${r.id}`,
+    });
+    await this.audit.log({ actor: user, patientId: r.patientId, action: 'WRITE', resource: `Demande de sang annulée (${PRODUCT_LABEL[r.product]} ${r.bloodGroup})`, reason: reason?.trim() || undefined, ip });
+    return { ok: true, donorsInformed: waiting.length, reservedReturned: r.reservedUnits };
   }
 
   /**
@@ -501,7 +540,7 @@ export class BloodService {
     const rows = await this.prisma.bloodRequest.findMany({
       where: {
         status: { in: NEEDS_BLOOD },
-        neededBy: { gt: new Date(Date.now() - 6 * 3600_000) },
+        neededBy: { gt: new Date(Date.now() - NEARBY_GRACE_MS) },
         alerts: { none: { donorId: donor.id } },
         patient: { OR: [{ userId: null }, { userId: { not: user.id } }] },
       },
@@ -552,7 +591,7 @@ export class BloodService {
     if (km > RADIUS_STEPS[RADIUS_STEPS.length - 1]) throw new BadRequestException('Cet hôpital est trop loin de chez vous.');
     if (existing?.status === 'ENVOYEE') return this.respond(existing.id, true, 'APP');
 
-    const appointment = nextSlot(accepted);
+    const appointment = nextSlot(accepted, req.urgency, req.neededBy);
     const data = { status: 'ACCEPTEE', volunteer: true, respondedAt: new Date(), appointment, channel: 'APP', distanceKm: km };
     // Une seule proposition par donneur et par demande : l'appel déjà refusé ou expiré est réclamé sous garde,
     // sinon la contrainte unique (demande, donneur) arrête le doublon d'un double appui.
@@ -647,7 +686,8 @@ export class BloodService {
 
     const site = await this.prisma.facility.findUniqueOrThrow({ where: { id: siteId } });
     const complete = await this.closeIfCovered(req.id);
-    if (complete) await this.prisma.bloodRequest.updateMany({ where: { id: req.id, status: { in: ['OUVERTE', 'DONNEURS_ALERTES'] } }, data: { status: 'POCHES_RESERVEES' } });
+    // Besoin couvert (poches seules, ou poches + donneurs) : la demande n'a plus rien à chercher.
+    if (complete) await this.prisma.bloodRequest.updateMany({ where: { id: req.id, status: { in: NEEDS_BLOOD } }, data: { status: 'POCHES_RESERVEES' } });
     const place = placeOf(req.facility);
     const siteName = placeOf(site);
     await this.notifications.notify(req.requesterId, {
@@ -725,7 +765,7 @@ export class BloodService {
     } else if (!ministry && r.requesterId !== user.id && r.patient.userId !== user.id) {
       await this.access.assert(user, r.patientId, CLINICAL_ROLES.includes(user.role) ? 'summary' : 'blood', 'Demande de sang', ip);
     }
-    const final = ['SERVIE', 'ANNULEE'].includes(r.status);
+    const final = FINAL_STATUSES.includes(r.status);
 
     // Qui a été prévenu : donneurs par canal, rayon atteint, banque de sang, sites avec du stock compatible.
     const alerted = r.alerts.filter((a) => !a.volunteer);
@@ -733,7 +773,8 @@ export class BloodService {
     for (const a of alerted) byChannel[a.channel] = (byChannel[a.channel] ?? 0) + 1;
     const farthest = alerted.reduce((m, a) => Math.max(m, a.distanceKm), 0);
     const [antsNotified, stock, sites] = await Promise.all([
-      this.prisma.notification.count({ where: { href: `/ants#demande-${r.id}`, user: { role: 'BLOOD_BANK' } } }),
+      // Comptes de banque de sang prévenus au moins une fois (création, donneur trouvé…) : une personne, une fois.
+      this.prisma.notification.findMany({ where: { href: `/ants#demande-${r.id}`, user: { role: 'BLOOD_BANK' } }, distinct: ['userId'], select: { userId: true } }).then((rows) => rows.length),
       final ? null : this.stockCheck(r.product, r.bloodGroup, r.facility.lat, r.facility.lng),
       this.siteNames([r.reservedSiteId]),
     ]);
@@ -893,7 +934,7 @@ export class BloodService {
       createdAt: r.createdAt,
       requester: r.requesterName,
       facility: placeOf(r.facility),
-      patient: anonymous ? null : `${r.patient.firstName} ${r.patient.lastName.charAt(0)}.`,
+      patient: anonymous ? null : shortName(r.patient),
       reserved: r.reservedUnits ? { units: r.reservedUnits, site: (r.reservedSiteId && sites.get(r.reservedSiteId)) || null } : null,
       coverage: coverage(r.quantity, accepted, r.reservedUnits),
       counts: {

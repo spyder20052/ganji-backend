@@ -20,6 +20,7 @@ export class EmergencyController {
   }
 
   @Roles('PRACTITIONER', 'NURSE')
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
   @Post('break-glass')
   @HttpCode(200)
   breakGlass(@CurrentUser() u: AuthUser, @Body() dto: BreakGlassDto, @Req() req: Request) {

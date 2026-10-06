@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put, Req }
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthUser, CurrentUser, Roles } from '../common/auth-user';
-import { CreateBloodRequestDto, DonorProfileDto, ReserveDto, RespondDto, ServedDto, StockDto } from './blood.dto';
+import { CancelRequestDto, CreateBloodRequestDto, DonorProfileDto, ReserveDto, RespondDto, ServedDto, StockDto } from './blood.dto';
 import { BloodService } from './blood.service';
 
 @ApiTags('M4 · Sang')
@@ -59,6 +59,14 @@ export class BloodController {
   @ApiOperation({ summary: 'Transfusion faite : seuls les donneurs cochés (qui ont réellement donné) voient leur don inscrit' })
   served(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: ServedDto, @Req() req: Request) {
     return this.svc.markServed(u, id, dto.donorAlertIds ?? [], req.ip);
+  }
+
+  @Roles('PRACTITIONER', 'NURSE', 'BLOOD_BANK')
+  @Post('requests/:id/cancel')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Annule une demande (erreur, besoin disparu) : donneurs attendus prévenus, poches réservées rendues au stock' })
+  cancel(@CurrentUser() u: AuthUser, @Param('id', ParseUUIDPipe) id: string, @Body() dto: CancelRequestDto, @Req() req: Request) {
+    return this.svc.cancel(u, id, dto.reason, req.ip);
   }
 
   @Roles('PATIENT', 'CAREGIVER')

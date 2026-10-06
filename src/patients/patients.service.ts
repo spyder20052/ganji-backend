@@ -1,6 +1,6 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
 import { randomBytes, randomInt } from 'node:crypto';
-import { AccessService, Scope } from '../common/access.service';
+import { AccessService } from '../common/access.service';
 import { AuditService } from '../common/audit.service';
 import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
@@ -8,6 +8,7 @@ import { sms } from '../common/i18n';
 import { OutboxService } from '../common/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { normalizePhone } from '../auth/auth.dto';
+import { ageOn } from '../common/time';
 import { DelegationDto, DocumentDto, EncounterDto, ObservationDto, ShareDto } from './patients.dto';
 import { specialtyLabel } from '../data/specialties';
 import { LISTEN_AUDIT_PREFIX } from '../listen/listen.constants';
@@ -23,12 +24,14 @@ export const OBS_META: Record<string, { label: string; unit: string; low?: numbe
   HEIGHT: { label: 'Taille', unit: 'cm' },
 };
 
-function age(birth: Date) {
-  const d = new Date();
-  let a = d.getFullYear() - birth.getFullYear();
-  if (d < new Date(d.getFullYear(), birth.getMonth(), birth.getDate())) a--;
-  return a;
-}
+/** Le QR ou le code de partage doit être scanné dans ce délai ; ensuite l'accès dure `durationHours`. */
+const SHARE_SCAN_WINDOW_MS = 15 * 60_000;
+const DEFAULT_SHARE_HOURS = 24;
+/** Code de partage : au-delà de 10 codes faux en 15 minutes, le soignant attend (force brute sur 6 chiffres). */
+const REDEEM_MAX_FAILURES = 10;
+const REDEEM_WINDOW_MS = 15 * 60_000;
+const REDEEM_DENIED = 'Code de partage invalide ou expiré';
+const SHARE_PAYLOAD = /^ganji:share:([A-Za-z0-9_-]+)(?::\d+)?$/;
 
 @Injectable()
 export class PatientsService {
@@ -65,7 +68,7 @@ export class PatientsService {
       id: p.id,
       firstName: p.firstName,
       lastName: p.lastName,
-      age: age(p.birthDate),
+      age: ageOn(p.birthDate),
       birthDate: p.birthDate,
       sex: p.sex,
       bloodGroup: p.bloodGroup,
@@ -75,7 +78,9 @@ export class PatientsService {
       conditions: p.conditions
         .filter((c) => !c.sensitive || withSensitive)
         .map((c) => ({ id: c.id, code: c.code, label: this.crypto.decrypt(c.labelEnc), since: c.onsetAt })),
-      hiddenSensitive: p.conditions.some((c) => c.sensitive) && !withSensitive,
+      // Toujours vrai sans le volet « sensible » : dire « rien de masqué » révélerait l'absence (donc parfois la
+      // présence) d'une pathologie du compartiment sensible.
+      hiddenSensitive: !withSensitive,
       emergencyContact: p.emergencyName ? { name: p.emergencyName, phone: p.emergencyPhone } : null,
       commune: p.commune?.name ?? null,
       department: p.commune?.departmentCode ?? null,
@@ -88,7 +93,7 @@ export class PatientsService {
         facility: m.practitioner.facility?.shortName ?? m.practitioner.facility?.name,
       })),
       pregnancy: p.pregnancies[0] ?? null,
-      children: p.children.map((c) => ({ id: c.id, firstName: c.firstName, age: age(c.birthDate) })),
+      children: p.children.map((c) => ({ id: c.id, firstName: c.firstName, age: ageOn(c.birthDate) })),
       discreetMode: p.discreetMode,
       access: { via: decision.via, expiresAt: decision.consentExpiresAt ?? null },
     };
@@ -153,6 +158,8 @@ export class PatientsService {
     this.requireClinical(user);
     await this.access.assert(user, patientId, 'observations', 'Ajout de résultat', ip);
     const meta = OBS_META[dto.code];
+    const date = dto.date ? new Date(dto.date) : new Date();
+    if (Number.isNaN(date.getTime()) || date.getTime() > Date.now() + 60_000) throw new BadRequestException('Date du résultat invalide ou dans le futur');
     const obs = await this.prisma.observation.create({
       data: {
         patientId,
@@ -162,7 +169,7 @@ export class PatientsService {
         refLow: meta.low,
         refHigh: meta.high,
         value: dto.value,
-        date: dto.date ? new Date(dto.date) : new Date(),
+        date,
         source: user.name,
       },
     });
@@ -241,12 +248,13 @@ export class PatientsService {
     const patients = await this.prisma.patient.findMany({
       where: { id: { in: ids } },
       select: { id: true, firstName: true, lastName: true, birthDate: true, sex: true, bloodGroup: true, commune: { select: { name: true } } },
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }],
     });
     return patients.map((p) => {
       const c = consents.find((x) => x.patientId === p.id);
       return {
         ...p,
-        age: age(p.birthDate),
+        age: ageOn(p.birthDate),
         commune: p.commune?.name,
         via: team.some((t) => t.patientId === p.id) ? 'CARE_TEAM' : c?.source === 'BREAK_GLASS' ? 'BREAK_GLASS' : 'CONSENT',
         expiresAt: c?.expiresAt ?? null,
@@ -258,13 +266,13 @@ export class PatientsService {
 
   async share(user: AuthUser, dto: ShareDto) {
     const patientId = this.ownPatientId(user);
-    const hours = dto.hours ?? 24;
-    let shareCode = '';
-    for (let i = 0; i < 5; i++) {
-      shareCode = randomInt(0, 1_000_000).toString().padStart(6, '0');
-      const clash = await this.prisma.consent.findUnique({ where: { shareCode } });
-      if (!clash) break;
+    const hours = dto.hours ?? DEFAULT_SHARE_HOURS;
+    let shareCode: string | null = null;
+    for (let i = 0; i < 5 && !shareCode; i++) {
+      const candidate = randomInt(0, 1_000_000).toString().padStart(6, '0');
+      if (!(await this.prisma.consent.findUnique({ where: { shareCode: candidate } }))) shareCode = candidate;
     }
+    if (!shareCode) throw new ConflictException('Impossible de générer un code de partage pour le moment. Réessayez.');
     const consent = await this.prisma.consent.create({
       data: {
         patientId,
@@ -272,7 +280,8 @@ export class PatientsService {
         source: 'QR',
         shareCode,
         shareToken: randomBytes(24).toString('base64url'),
-        expiresAt: new Date(Date.now() + 15 * 60_000), // le QR doit être scanné dans les 15 min
+        durationHours: hours,
+        expiresAt: new Date(Date.now() + SHARE_SCAN_WINDOW_MS),
       },
     });
     await this.audit.log({ actor: user, patientId, action: 'CONSENT_OFFER', resource: `Partage (${dto.scopes.join(', ')})`, reason: `${hours} h` });
@@ -290,13 +299,13 @@ export class PatientsService {
     if (!CLINICAL_ROLES.includes(user.role) && user.role !== 'PHARMACIST') {
       throw new ForbiddenException('Seul un professionnel de santé vérifié peut ouvrir un carnet partagé');
     }
-    let raw = token.trim();
-    let hours = 24;
-    const m = raw.match(/^ganji:share:([A-Za-z0-9_-]+):(\d+)$/);
-    if (m) {
-      raw = m[1];
-      hours = Math.min(168, Math.max(1, Number(m[2])));
-    }
+    // Les refus sont au journal (ajout seul) : ils servent de compteur, partagé entre toutes les instances.
+    const failures = await this.prisma.auditEvent.count({
+      where: { actorId: user.id, action: 'DENIED', resource: REDEEM_DENIED, at: { gt: new Date(Date.now() - REDEEM_WINDOW_MS) } },
+    });
+    if (failures >= REDEEM_MAX_FAILURES) throw new HttpException('Trop de codes faux. Réessayez dans 15 minutes.', HttpStatus.TOO_MANY_REQUESTS);
+    // Le QR porte la durée à titre indicatif ; celle qui compte est celle que le patient a enregistrée.
+    const raw = SHARE_PAYLOAD.exec(token.trim())?.[1] ?? token.trim();
     const consent = await this.prisma.consent.findFirst({
       where: {
         OR: [{ shareToken: raw }, { shareCode: raw }],
@@ -306,9 +315,10 @@ export class PatientsService {
       },
     });
     if (!consent) {
-      await this.audit.log({ actor: user, action: 'DENIED', resource: 'Code de partage invalide ou expiré', allowed: false, ip });
+      await this.audit.log({ actor: user, action: 'DENIED', resource: REDEEM_DENIED, allowed: false, ip });
       throw new BadRequestException('Code invalide, expiré ou déjà utilisé. Demandez au patient de générer un nouveau QR.');
     }
+    const hours = consent.durationHours;
     const updated = await this.prisma.consent.update({
       where: { id: consent.id },
       data: {
@@ -360,9 +370,18 @@ export class PatientsService {
     return { ok: true };
   }
 
-  async accessLog(user: AuthUser, patientIdParam?: string) {
+  /**
+   * Journal d'accès : le titulaire, son parent ou un aidant délégué. Un soignant, même avec consentement,
+   * n'a pas à savoir qui d'autre a lu le carnet (noms des confrères, bris de glace).
+   */
+  async accessLog(user: AuthUser, patientIdParam?: string, ip?: string) {
     const patientId = patientIdParam ?? this.ownPatientId(user);
-    if (patientIdParam) await this.access.assert(user, patientIdParam, 'summary', "Journal d'accès");
+    if (patientIdParam) {
+      const decision = await this.access.assert(user, patientIdParam, 'summary', "Journal d'accès", ip);
+      if (decision.via !== 'OWNER' && decision.via !== 'PARENT' && decision.via !== 'DELEGATION') {
+        throw new ForbiddenException("Le journal d'accès n'est visible que du patient et de ses proches.");
+      }
+    }
     // Écoute psychologique (compartiment sensible) : visible du titulaire seulement, jamais d'un aidant.
     const owner = patientId === user.patientId;
     const rows = await this.prisma.auditEvent.findMany({
@@ -435,10 +454,6 @@ export class PatientsService {
 
   requireClinical(user: AuthUser) {
     if (!CLINICAL_ROLES.includes(user.role)) throw new ForbiddenException('Réservé aux soignants');
-  }
-
-  assertScope(s: string): Scope {
-    return s as Scope;
   }
 }
 

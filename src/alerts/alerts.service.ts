@@ -1,9 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import type { Lang } from '@prisma/client';
 import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/auth-user';
 import { label, sms } from '../common/i18n';
-import { OutboxService } from '../common/outbox.service';
+import { isMedicalText, OutboxService } from '../common/outbox.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlertDto, ReportDto } from './alerts.dto';
 
@@ -19,10 +19,20 @@ export const SYNDROMES: Record<string, string> = {
 /** Seuils de regroupement sur 7 jours glissants (démonstration ; à fixer avec la DNSP). */
 const CLUSTER_WINDOW_DAYS = 7;
 const CLUSTER_MIN_REPORTS = 3;
+/** Une alerte automatique reste affichée deux semaines ; tant qu'elle l'est, un nouveau signalement ne la recrée pas. */
+const CLUSTER_ALERT_DAYS = 14;
 const IMMEDIATE = new Set(['PARALYSIE', 'FIEVRE_HEMORRAGIQUE']);
+/** Diffusion SMS d'une alerte officielle : plafonnée en démonstration. */
+const BROADCAST_MAX = 50;
+const SMS_MAX_CHARS = 300;
+/** Un signalement saisi hors ligne peut dater d'un mois au plus ; jamais du futur. */
+const REPORT_MAX_AGE_MS = 30 * 86_400_000;
+const CLOCK_SKEW_MS = 5 * 60_000;
 
 @Injectable()
 export class AlertsService {
+  private readonly logger = new Logger(AlertsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
@@ -64,6 +74,11 @@ export class AlertsService {
   }
 
   async create(user: AuthUser, dto: CreateAlertDto) {
+    // Le SMS part tel quel : un titre comme « Dépistage du diabète » serait refusé par la file d'envoi après
+    // l'enregistrement de l'alerte. On le dit avant d'écrire quoi que ce soit.
+    if (isMedicalText(`${dto.title} ${dto.message}`)) {
+      throw new BadRequestException('Ce texte contient un terme médical que les SMS ne peuvent pas transporter. Reformulez (ex. « campagne de dépistage gratuite ») : le détail reste dans l’application.');
+    }
     const communes = dto.communes?.length ? await this.prisma.commune.findMany({ where: { name: { in: dto.communes } } }) : [];
     if (dto.communes?.length && communes.length !== dto.communes.length) throw new BadRequestException('Commune inconnue');
     const alert = await this.prisma.healthAlert.create({
@@ -77,24 +92,36 @@ export class AlertsService {
         communes: { create: communes.map((c) => ({ communeId: c.id })) },
       },
     });
-    // Diffusion SMS aux habitants inscrits des communes ciblées (plafonnée en démo).
+    // Diffusion SMS aux habitants inscrits des communes ciblées (plafonnée en démo). Un envoi refusé n'arrête
+    // pas les autres : l'alerte existe, chaque personne jointe compte.
     const recipients = await this.prisma.user.findMany({
       where: { phone: { not: null }, patient: communes.length ? { communeId: { in: communes.map((c) => c.id) } } : { isNot: null } },
       select: { phone: true, lang: true },
-      take: 50,
+      take: BROADCAST_MAX,
     });
+    let broadcast = 0;
     for (const r of recipients) {
-      // Titre et message tels que rédigés par le ministère : seul l'habillage suit la langue de la personne.
-      await this.outbox.send({ channel: 'SMS', to: r.phone!, lang: r.lang, body: sms('alerts.broadcast', r.lang, { title: dto.title, message: dto.message }).slice(0, 300), ref: `alert:${alert.id}` });
+      try {
+        // Titre et message tels que rédigés par le ministère : seul l'habillage suit la langue de la personne.
+        await this.outbox.send({ channel: 'SMS', to: r.phone!, lang: r.lang, body: sms('alerts.broadcast', r.lang, { title: dto.title, message: dto.message }).slice(0, SMS_MAX_CHARS), ref: `alert:${alert.id}` });
+        broadcast++;
+      } catch (e) {
+        this.logger.warn(`Alerte ${alert.id} : envoi impossible à un destinataire (${(e as Error).message})`);
+      }
     }
-    await this.audit.log({ actor: user, action: 'ALERT', resource: `Alerte « ${dto.title} » (${communes.length || 'national'})` });
-    return { id: alert.id, broadcast: recipients.length };
+    await this.audit.log({ actor: user, action: 'ALERT', resource: `Alerte « ${dto.title} » (${communes.length || 'national'})`, reason: `${broadcast} SMS` });
+    return { id: alert.id, broadcast };
   }
 
   /** Signalement communautaire en 3 gestes : quoi, combien, où. Fonctionne hors ligne (file de synchronisation). */
   async report(user: AuthUser | null, dto: ReportDto) {
     const commune = await this.prisma.commune.findUnique({ where: { name: dto.commune } });
     if (!commune) throw new BadRequestException('Commune inconnue');
+    if (dto.observedAt) {
+      const at = new Date(dto.observedAt).getTime();
+      // Une date future resterait indéfiniment dans la fenêtre de détection ; une date trop ancienne n'y entre jamais.
+      if (at > Date.now() + CLOCK_SKEW_MS || at < Date.now() - REPORT_MAX_AGE_MS) throw new BadRequestException('Date d’observation invalide : dans le mois écoulé, jamais dans le futur.');
+    }
     const r = await this.prisma.communityReport.create({
       data: {
         relayId: user?.id,
@@ -154,7 +181,8 @@ export class AlertsService {
         sms('alerts.cluster.title', lang, { syndrome: (l) => label('alerts.syndrome', g.syndrome, l, SYNDROMES[g.syndrome].toLowerCase()), commune: commune.name });
       // Titre enregistré en français (tableau de bord, dédoublonnage) ; le SMS suit la langue de chaque agent.
       const title = titleIn('fr');
-      const exists = await this.prisma.healthAlert.findFirst({ where: { auto: true, title, createdAt: { gte: since } } });
+      // Tant que l'alerte automatique est affichée, de nouveaux signalements ne la recréent pas.
+      const exists = await this.prisma.healthAlert.findFirst({ where: { auto: true, title, expiresAt: { gt: new Date() } } });
       if (exists) continue;
       await this.prisma.healthAlert.create({
         data: {
@@ -164,7 +192,7 @@ export class AlertsService {
           message: `${g._count._all} signalement(s) communautaire(s), ${g._sum.cases ?? 0} cas en ${CLUSTER_WINDOW_DAYS} jours. Investigation recommandée par l'équipe de la zone sanitaire.`,
           source: 'Détection automatique Ganji',
           auto: true,
-          expiresAt: new Date(Date.now() + 14 * 86_400_000),
+          expiresAt: new Date(Date.now() + CLUSTER_ALERT_DAYS * 86_400_000),
           communes: { create: [{ communeId: commune.id }] },
         },
       });

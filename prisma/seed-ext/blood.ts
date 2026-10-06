@@ -1,6 +1,8 @@
 import { deflateSync } from 'node:zlib';
 import type { Lang } from '@prisma/client';
 import type { SeedCtx } from './context';
+import { donorChannel } from '../../src/blood/blood.logic';
+import { distanceKm } from '../../src/common/geo';
 
 /**
  * Données de démonstration du don de sang et du partage de documents (rejouable :
@@ -137,16 +139,18 @@ export async function seedBlood(ctx: SeedCtx) {
       take: 3,
     });
     for (const [k, c] of crowd.entries()) {
-      const km = Math.round(Math.hypot((c.lat - d.facility.lat) * 111, (c.lng - d.facility.lng) * 110) * 10) / 10;
-      await prisma.donorAlert.create({ data: { requestId: d.id, donorId: c.id, distanceKm: km, channel: c.hasSmartphone ? 'APP' : c.lang !== 'fr' ? 'VOICE' : 'SMS', createdAt: new Date(d.createdAt.getTime() + (k + 1) * 60_000) } });
+      // Même distance et même canal que le service (sinon l'écran du médecin et l'historique divergent).
+      const km = distanceKm(d.facility.lat, d.facility.lng, c.lat, c.lng);
+      await prisma.donorAlert.create({ data: { requestId: d.id, donorId: c.id, distanceKm: km, channel: donorChannel(c), createdAt: new Date(d.createdAt.getTime() + (k + 1) * 60_000) } });
     }
     const place = d.facility.shortName ?? d.facility.name;
-    const label = d.product === 'CGR' ? 'globules rouges' : 'plaquettes';
+    const label = d.product === 'CGR' ? 'globules rouges' : d.product === 'PLASMA' ? 'plasma' : 'plaquettes';
+    const urgencyLabel = d.urgency === 'VITALE' ? 'urgence vitale' : d.urgency === 'PROGRAMMEE' ? 'programmée' : 'urgente';
     if (antsIds.length) {
       await prisma.notification.createMany({
         data: antsIds.map((userId) => ({
           userId, kind: 'SANG', title: `Demande de sang ${group} · ${place}`, href: `/ants#demande-${d.id}`, createdAt: d.createdAt,
-          body: `${d.quantity} poche${d.quantity > 1 ? 's' : ''} de ${label} ${group}, ${d.urgency === 'VITALE' ? 'urgence vitale' : 'urgente'}. Demandée par ${requester.displayName}.`,
+          body: `${d.quantity} poche${d.quantity > 1 ? 's' : ''} de ${label} ${group}, ${urgencyLabel}. Demandée par ${requester.displayName}.`,
         })),
       });
     }

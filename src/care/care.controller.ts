@@ -2,7 +2,7 @@ import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Query, Req
 import { ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import { AuthUser, CurrentUser, Roles } from '../common/auth-user';
-import { SymptomDto, TeleAnswerDto, TeleRequestDto } from './care.dto';
+import { PatientQueryDto, SymptomDto, TeleAnswerDto, TeleRequestDto } from './care.dto';
 import { CareService } from './care.service';
 
 @ApiTags('M3 · Parcours de soins chronique')
@@ -11,8 +11,8 @@ export class CareController {
   constructor(private readonly svc: CareService) {}
 
   @Get('plan')
-  plan(@CurrentUser() u: AuthUser, @Query('patientId') patientId?: string) {
-    return this.svc.plan(u, patientId);
+  plan(@CurrentUser() u: AuthUser, @Query() q: PatientQueryDto, @Req() req: Request) {
+    return this.svc.plan(u, q.patientId, req.ip);
   }
 
   @Roles('PATIENT', 'CAREGIVER')
@@ -23,13 +23,13 @@ export class CareController {
   }
 
   @Post('symptoms')
-  symptom(@CurrentUser() u: AuthUser, @Body() dto: SymptomDto) {
-    return this.svc.logSymptom(u, dto);
+  symptom(@CurrentUser() u: AuthUser, @Body() dto: SymptomDto, @Req() req: Request) {
+    return this.svc.logSymptom(u, dto, req.ip);
   }
 
   @Get('symptoms')
-  symptoms(@CurrentUser() u: AuthUser, @Query('patientId') patientId?: string) {
-    return this.svc.symptoms(u, patientId);
+  symptoms(@CurrentUser() u: AuthUser, @Query() q: PatientQueryDto, @Req() req: Request) {
+    return this.svc.symptoms(u, q.patientId, req.ip);
   }
 }
 

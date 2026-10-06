@@ -1,5 +1,6 @@
 import type { Lang } from '@prisma/client';
 import { clock, label, sms, TZ, weekdayDate } from '../common/i18n';
+import { startOfBeninDay } from '../common/time';
 
 /**
  * Ce que la personne choisit pour prendre rendez-vous : un service compréhensible (« Enfant », « Cœur »),
@@ -48,10 +49,7 @@ export const serviceLabel = (code: string, lang: Lang = 'fr') => label('rdv.serv
 const DAY = 86_400_000;
 
 /** Début de la journée (heure du Bénin) contenant `d`. */
-export function startOfDayBenin(d: Date): Date {
-  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(d);
-  return new Date(`${ymd}T00:00:00+01:00`);
-}
+export const startOfDayBenin = startOfBeninDay;
 
 /** Un souhait de date : à partir d'aujourd'hui, au plus tard dans 90 jours. */
 export function checkPreferred(preferredAt: Date, now = new Date()): string | null {

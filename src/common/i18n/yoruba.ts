@@ -109,7 +109,6 @@ export const YORUBA: Record<string, string> = {
   "listen.n.urgent.body": "Ẹnìkan kọ ọ̀rọ̀ ìdààmú ńlá. Ẹ kọ́kọ́ dá a lóhùn.",
   "listen.n.urgent.title": "Ìgbọ́rọ̀: ìdààmú ńlá",
   "listen.reply": "Ganji: ẹ ní iṣẹ́ tuntun nínú app.",
-  "maternal.danger": "Ganji: {prenom} sọ pé òun ní àmì ewu oyún. Ẹ jọ̀ọ́ ẹ pè é, kí ẹ sì bá a lọ sí ilé ìgbẹ̀bí.",
   "medications.dispensed": "Ganji: {pharmacy} ti fún yín ní oògùn inú ìwé oògùn yín.",
   "order.accepted": "Ganji: {pharmacy} ti gba ìbéèrè oògùn {ref} yín. Wọ́n ń pèsè rẹ̀.",
   "order.cancelled": "Ganji: a ti fagi lé ìbéèrè oògùn {ref}.",

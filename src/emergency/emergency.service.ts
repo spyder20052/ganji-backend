@@ -1,8 +1,10 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException } from '@nestjs/common';
+import { AccessService } from '../common/access.service';
 import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { sms } from '../common/i18n';
+import { ageOn } from '../common/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { BreakGlassDto, SosDto } from './emergency.dto';
 import { Origin, Recipient, RespondersService } from './responders.service';
@@ -10,14 +12,10 @@ import { Origin, Recipient, RespondersService } from './responders.service';
 /** Durée d'un accès en bris de glace. */
 const BREAK_GLASS_HOURS = 12;
 const BREAK_GLASS_SCOPES = ['summary', 'timeline', 'observations', 'documents', 'prescriptions'];
+/** Au-delà, le soignant est bloqué une heure : un service d'urgence n'ouvre pas plus de dossiers inconnus que cela. */
+const BREAK_GLASS_PER_HOUR = 3;
 /** Le patient est prévenu au plus une fois par heure qu'on a lu sa carte d'urgence. */
 const CARD_NOTICE_INTERVAL_MS = 3600_000;
-
-function age(birth: Date, now = new Date()) {
-  let a = now.getFullYear() - birth.getFullYear();
-  if (now < new Date(now.getFullYear(), birth.getMonth(), birth.getDate())) a--;
-  return a;
-}
 
 /** Numéro et langue du titulaire du carnet, ou de son parent pour un enfant. */
 type Contact = { phone: string | null; lang: Recipient['lang'] } | null;
@@ -37,6 +35,7 @@ export class EmergencyService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly crypto: CryptoService,
+    private readonly access: AccessService,
     private readonly responders: RespondersService,
   ) {}
 
@@ -77,7 +76,7 @@ export class EmergencyService {
       name: `${patient.firstName} ${patient.lastName.charAt(0)}.`,
       firstName: patient.firstName,
       lastNameInitial: patient.lastName.charAt(0),
-      age: age(patient.birthDate),
+      age: ageOn(patient.birthDate),
       sex: patient.sex,
       bloodGroup: patient.bloodGroup,
       allergies: patient.allergies,
@@ -89,18 +88,35 @@ export class EmergencyService {
   }
 
   /**
-   * Bris de glace : accès exceptionnel de 12 h au dossier (hors compartiment
-   * sensible), motivé, journalisé, notifié au patient, à ses aidants et au contrôle.
+   * Bris de glace : accès exceptionnel de 12 h au dossier (hors compartiment sensible), motivé, journalisé,
+   * notifié au patient, à ses aidants et au contrôle. Réservé aux soignants vérifiés ; un accès déjà ouvert
+   * (équipe de soins, consentement, bris de glace en cours) est rendu tel quel, sans nouvelle alerte ;
+   * au plus trois dossiers inconnus ouverts par heure et par soignant.
    */
   async breakGlass(user: AuthUser, dto: BreakGlassDto, ip?: string) {
     if (!dto.patientId && !dto.qrToken) throw new BadRequestException('Indiquez le patient : identifiant ou QR de sa carte');
+    const practitioner = user.practitionerId ? await this.prisma.practitioner.findUnique({ where: { id: user.practitionerId }, select: { verifiedAt: true } }) : null;
     const patient = await this.prisma.patient.findFirst({
       where: dto.patientId ? { id: dto.patientId } : { qrToken: dto.qrToken },
       select: { id: true, ...HOLDER_SELECT },
     });
     if (!patient) throw new NotFoundException('Patient introuvable');
-
+    if (!practitioner?.verifiedAt) {
+      await this.audit.log({ actor: user, patientId: patient.id, action: 'DENIED', resource: 'Bris de glace', reason: 'Soignant non vérifié', allowed: false, ip });
+      throw new ForbiddenException('Le bris de glace est réservé aux soignants dont l’inscription à l’Ordre a été vérifiée.');
+    }
+    const current = await this.access.decide(user, patient.id, 'summary');
+    if (current.allowed) {
+      return { patientId: patient.id, expiresAt: current.consentExpiresAt ?? null, scopes: BREAK_GLASS_SCOPES, via: current.via, alreadyOpen: true };
+    }
     const now = new Date();
+    const recent = await this.prisma.consent.count({
+      where: { granteeId: user.id, source: 'BREAK_GLASS', createdAt: { gt: new Date(now.getTime() - 3600_000) } },
+    });
+    if (recent >= BREAK_GLASS_PER_HOUR) {
+      await this.audit.log({ actor: user, patientId: patient.id, action: 'DENIED', resource: 'Bris de glace', reason: `Plus de ${BREAK_GLASS_PER_HOUR} accès en urgence en une heure`, allowed: false, ip });
+      throw new HttpException('Trop d’accès en urgence en une heure. Le contrôleur de votre établissement est prévenu.', HttpStatus.TOO_MANY_REQUESTS);
+    }
     const consent = await this.prisma.consent.create({
       data: {
         patientId: patient.id,

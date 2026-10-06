@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import type { Localized } from './i18n';
 import { OutboxService } from './outbox.service';
 
-export type NotificationKind = 'RDV' | 'SANG' | 'COMMANDE' | 'ECOUTE' | 'CERCLE' | 'DROITS' | 'TRAITEMENT' | 'PARTAGE' | 'PROFIL' | 'SYSTEME';
+export type NotificationKind = 'RDV' | 'SANG' | 'COMMANDE' | 'ECOUTE' | 'CERCLE' | 'DROITS' | 'TRAITEMENT' | 'AVIS' | 'PARTAGE' | 'PROFIL' | 'SYSTEME';
 
 export interface NotificationInput {
   kind: NotificationKind;

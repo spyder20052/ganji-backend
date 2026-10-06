@@ -4,6 +4,7 @@ import { normalizePhone } from '../auth/auth.dto';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
+import { withoutRole } from '../common/names';
 import { NotificationsService } from '../common/notifications.service';
 import { note, sms } from '../common/i18n';
 import { detectDistress } from '../data/distress';
@@ -33,10 +34,7 @@ const READ_LOG_EVERY_MS = 15 * 60_000;
 const SYSTEM_KEY = new Map<string, keyof typeof LISTEN_SYSTEM>(Object.entries(LISTEN_SYSTEM).map(([k, v]) => [v, k as keyof typeof LISTEN_SYSTEM]));
 type ThreadWithMessages = ListenThread & { messages: ListenMessage[] };
 
-/** « Mme Hounkpè (écoute) » → « Mme Hounkpè ». */
-function shortName(displayName: string) {
-  return displayName.replace(/\s*\([^)]*\)\s*$/, '').trim();
-}
+const shortName = withoutRole;
 
 /**
  * Écoute psychologique : conversation confidentielle entre une personne (patient ou aidant) et la

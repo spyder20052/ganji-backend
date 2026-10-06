@@ -116,6 +116,12 @@ describe.skipIf(!process.env.DATABASE_URL)('API Ganji sur base seedée', () => {
     });
 
     it('exige un motif précis pour le bris de glace, puis ouvre le dossier et prévient le contrôleur', async () => {
+      // Un bris de glace encore actif (lancement précédent) est rendu tel quel, sans nouvelle alerte, et trois par
+      // heure au plus : on efface ceux des lancements précédents pour repartir d'un accès fermé.
+      const { PrismaClient } = await import('@prisma/client');
+      const prisma = new PrismaClient();
+      await prisma.consent.deleteMany({ where: { granteeId: me['dr-sans-consentement'].id, source: 'BREAK_GLASS' } });
+      await prisma.$disconnect();
       await as('dr-sans-consentement').post('/emergency/break-glass').send({ patientId: me.bio.patientId, reason: 'urgence' }).expect(400);
       await as('dr-sans-consentement')
         .post('/emergency/break-glass')
@@ -182,8 +188,7 @@ describe.skipIf(!process.env.DATABASE_URL)('API Ganji sur base seedée', () => {
       const payload: string = rx.body.qrPayload;
 
       await as('pharmacie-cotonou').post('/prescriptions/dispense').send({ payload }).expect(200);
-      const second = await as('pharmacie-parakou').post('/prescriptions/dispense').send({ payload });
-      expect(second.status).toBeGreaterThanOrEqual(400);
+      const second = await as('pharmacie-parakou').post('/prescriptions/dispense').send({ payload }).expect(409);
       expect(JSON.stringify(second.body)).toMatch(/déjà délivrée/i);
 
       const forged = `${payload.slice(0, -4)}AAAA`;
@@ -244,13 +249,17 @@ describe.skipIf(!process.env.DATABASE_URL)('API Ganji sur base seedée', () => {
   describe('M6 · télé-expertise', () => {
     it('une question de Djougou reçoit une réponse inscrite au carnet', async () => {
       const patients = await as('rachidatou').get('/patients').expect(200);
-      const patientId = (patients.body as { id: string }[])[0].id;
+      // Un patient de son équipe de soins (un consentement temporaire d'un autre test, en parallèle, n'ouvre pas forcément le volet « fiche vitale »).
+      const rows = patients.body as { id: string; via: string }[];
+      const patientId = (rows.find((p) => p.via === 'CARE_TEAM') ?? rows[0]).id;
       const t = await as('rachidatou')
         .post('/tele-expertise')
         .send({ patientId, specialty: 'HEMATOLOGIE', urgency: 'NORMALE', question: 'Hb à 6,5 g/dL malgré le traitement : transfusion sur place ou transfert ?' })
         .expect(201);
       await as('pharmacie-cotonou').post(`/tele-expertise/${t.body.id}/answer`).send({ answer: 'Réponse sans qualité pour répondre.' }).expect(403);
-      await as('houngbedji').post(`/tele-expertise/${t.body.id}/answer`).send({ answer: 'Transfusion sur place possible, transfert si fièvre ou détresse respiratoire.' }).expect(200);
+      const answered = await as('houngbedji').post(`/tele-expertise/${t.body.id}/answer`).send({ answer: 'Transfusion sur place possible, transfert si fièvre ou détresse respiratoire.' });
+      expect(answered.body, 'réponse du spécialiste').toEqual({ ok: true });
+      expect(answered.status).toBe(200);
       const timeline = await as('rachidatou').get(`/patients/${patientId}/timeline`).expect(200);
       expect(JSON.stringify(timeline.body)).toContain('Avis en hématologie');
     });

@@ -6,6 +6,8 @@ import { distanceKm } from '../common/geo';
 import { NotificationsService } from '../common/notifications.service';
 import { OutboxService } from '../common/outbox.service';
 import { note, sms, type Localized } from '../common/i18n';
+import { shortName } from '../common/names';
+import { ageOn } from '../common/time';
 import { PrismaService } from '../prisma/prisma.service';
 import { ConfirmDto, CreateAppointmentDto, FacilitiesQuery, RefuseDto } from './appointments.dto';
 import { canMove, checkPreferred, partOfDay, preferredText, reminderTitle, serviceLabel, sortForPatient, staffFilter, when, type ServiceCode } from './appointments.logic';
@@ -99,7 +101,7 @@ export class AppointmentsService {
     await this.audit.log({ actor: user, patientId, action: 'APPOINTMENT', resource: `Demande de rendez-vous (${a.facilityName})`, ip });
 
     const staffIds = await this.staffOf(facility.id);
-    const who = `${a.patient.firstName} ${a.patient.lastName.charAt(0)}.`;
+    const who = shortName(a.patient);
     await this.notifyEach(
       staffIds,
       note('rdv.n.request.title', 'rdv.n.request.body', { who, service: (l) => serviceLabel(code, l), preferred: (l) => preferredText(preferredAt, l) }),
@@ -129,7 +131,7 @@ export class AppointmentsService {
     const updated = await this.prisma.appointment.update({ where: { id }, data: { status: 'ANNULE' }, include: { patient: { select: { firstName: true, lastName: true } } } });
     await this.prisma.reminder.deleteMany({ where: { appointmentId: id, sentAt: null } });
     await this.audit.log({ actor: user, patientId: a.patientId, action: 'APPOINTMENT', resource: `Rendez-vous annulé (${a.facilityName})`, ip });
-    const who = `${a.patient.firstName} ${a.patient.lastName.charAt(0)}.`;
+    const who = shortName(a.patient);
     const date = a.scheduledAt ?? a.preferredAt;
     await this.notifyEach(
       await this.staffOf(a.facilityId),
@@ -175,7 +177,7 @@ export class AppointmentsService {
       updatedAt: a.updatedAt,
       patient: {
         name: `${a.patient.firstName} ${a.patient.lastName}`,
-        age: age(a.patient.birthDate),
+        age: ageOn(a.patient.birthDate),
         sex: a.patient.sex,
         commune: a.patient.commune?.name ?? null,
       },
@@ -357,9 +359,3 @@ export class AppointmentsService {
   }
 }
 
-function age(birth: Date) {
-  const d = new Date();
-  let a = d.getFullYear() - birth.getFullYear();
-  if (d < new Date(d.getFullYear(), birth.getMonth(), birth.getDate())) a--;
-  return a;
-}

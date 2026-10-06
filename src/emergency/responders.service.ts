@@ -41,12 +41,12 @@ export class RespondersService {
   }
 
   /**
-   * Relais communautaires à prévenir.
+   * Relais communautaires de la commune du patient.
    *
-   * Simplification assumée : le modèle User ne porte pas de commune. Un relais
-   * est rattaché à une commune s'il possède lui-même un carnet (Patient.communeId) ;
-   * à défaut, on prévient les premiers relais inscrits (MAX_RELAYS). En production,
-   * une table d'affectation relais ↔ commune/village remplacera ce repli.
+   * Simplification assumée : le modèle User ne porte pas de commune ; un relais est rattaché à la sienne
+   * par son propre carnet (Patient.communeId). En production, une table d'affectation relais ↔ village
+   * remplacera cela. En démonstration seulement, une commune sans relais inscrit retombe sur les premiers
+   * relais de la démo : jamais en production, un relais ne reçoit pas l'alerte d'une inconnue à 500 km.
    */
   async relays(communeId: string | null | undefined): Promise<Recipient[]> {
     const select = { phone: true, lang: true } as const;
@@ -57,7 +57,7 @@ export class RespondersService {
           take: MAX_RELAYS,
         })
       : [];
-    if (rows.length === 0) {
+    if (rows.length === 0 && process.env.DEMO_MODE === 'true') {
       rows = await this.prisma.user.findMany({
         where: { role: 'RELAY', phone: { not: null } },
         select,

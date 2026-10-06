@@ -13,9 +13,9 @@ export const RELAY_AFTER_HOURS = 6;
 export const MAX_AGE_HOURS = 48;
 export const ESCALATED_KINDS = ['MEDICATION', 'APPOINTMENT'];
 
-const HOUR = 3_600_000;
-/** Bénin : UTC+1 toute l'année (Africa/Porto-Novo, pas d'heure d'été). */
-const BENIN_OFFSET = HOUR;
+import { beninDay, DAY_MS, HOUR_MS as HOUR, startOfBeninDay } from '../common/time';
+
+export { beninDay };
 
 export interface ReminderTiming {
   kind: string;
@@ -59,13 +59,5 @@ export function canConfirm(r: ReminderTiming, now: Date): boolean {
 
 /** Lendemain, 10 h, heure du Bénin : moment de la visite du relais. */
 export function nextVisitDue(now: Date): Date {
-  const local = new Date(now.getTime() + BENIN_OFFSET);
-  return new Date(Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate() + 1, 10) - BENIN_OFFSET);
-}
-
-/** Début et fin de la journée en cours, heure du Bénin. */
-export function beninDay(now: Date): { start: Date; end: Date } {
-  const local = new Date(now.getTime() + BENIN_OFFSET);
-  const start = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - BENIN_OFFSET;
-  return { start: new Date(start), end: new Date(start + 24 * HOUR) };
+  return new Date(startOfBeninDay(now).getTime() + DAY_MS + 10 * HOUR);
 }

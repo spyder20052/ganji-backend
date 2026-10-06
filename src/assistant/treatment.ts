@@ -1,5 +1,5 @@
 import type { Prescription } from '@prisma/client';
-import type { PrescriptionItem } from '../medications/medications.service';
+import type { PrescriptionItem } from '../medications/medications.logic';
 import { parseDosage, startOfCotonouDay, type DosagePlan } from './dosage';
 
 const DAY = 86_400_000;

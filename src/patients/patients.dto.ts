@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayNotEmpty, IsArray, IsIn, IsInt, IsNumber, IsOptional, IsString, IsUUID, Length, Matches, Max, MaxLength, Min } from 'class-validator';
+import { ArrayMaxSize, ArrayNotEmpty, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsISO8601, IsNumber, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 
 export const SCOPES = ['summary', 'timeline', 'observations', 'documents', 'prescriptions', 'sensitive'] as const;
 
@@ -25,8 +25,8 @@ export class RedeemDto {
   token: string;
 }
 
-export class GrantDto extends ShareDto {
-  @ApiProperty() @IsUUID() granteeUserId: string;
+export class DiscreetDto {
+  @ApiProperty({ description: 'Mode discret : SMS et messages vocaux sans prénom ni détail' }) @IsBoolean() on: boolean;
 }
 
 export class DocumentDto {
@@ -48,8 +48,8 @@ export class ObservationDto {
   @ApiProperty({ enum: ['HB', 'PLT', 'WBC', 'GLY', 'TA_SYS', 'TA_DIA', 'WEIGHT', 'HEIGHT'] })
   @IsIn(['HB', 'PLT', 'WBC', 'GLY', 'TA_SYS', 'TA_DIA', 'WEIGHT', 'HEIGHT'])
   code: string;
-  @ApiProperty() @IsNumber() value: number;
-  @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(40) date?: string;
+  @ApiProperty() @IsNumber() @Min(0) @Max(100_000) value: number;
+  @ApiPropertyOptional({ example: '2026-09-24T08:30:00Z', description: 'Date du prélèvement (par défaut : maintenant)' }) @IsOptional() @IsISO8601() date?: string;
 }
 
 export class EncounterDto {
@@ -59,11 +59,18 @@ export class EncounterDto {
   @ApiProperty() @IsString() @Length(3, 2000) summary: string;
 }
 
+export const DELEGATION_SCOPES = ['summary', 'reminders', 'timeline', 'blood', 'appointments', 'orders', 'all'] as const;
+
 export class DelegationDto {
-  @ApiProperty({ example: '0197000002' }) @IsString() phone: string;
+  @ApiProperty({ example: '0197000002', description: 'Numéro béninois de l’aidant (il doit avoir un compte Ganji)' })
+  @Matches(/^\+?229\s?0?1?\d{8}$|^01\d{8}$/, { message: 'Numéro de téléphone béninois invalide' })
+  phone: string;
   @ApiProperty({ example: 'mère' }) @IsString() @Length(2, 30) relation: string;
-  @ApiProperty({ isArray: true, example: ['summary', 'reminders'], description: 'orders : commander les médicaments et suivre les commandes (module orders)' })
+  @ApiProperty({ isArray: true, enum: DELEGATION_SCOPES, example: ['summary', 'reminders'], description: 'orders : commander les médicaments et suivre les commandes (module orders)' })
   @IsArray()
-  @IsIn(['summary', 'reminders', 'timeline', 'blood', 'appointments', 'orders', 'all'], { each: true })
+  @ArrayNotEmpty()
+  @ArrayUnique()
+  @ArrayMaxSize(DELEGATION_SCOPES.length)
+  @IsIn(DELEGATION_SCOPES, { each: true })
   scopes: string[];
 }

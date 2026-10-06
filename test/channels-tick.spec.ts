@@ -30,6 +30,8 @@ describe('tâche planifiée : rappels envoyés par lots jusqu’à épuisement',
           Object.assign(pending.find((r) => r.id === where.id)!, { sent: true });
           return Promise.resolve({});
         }),
+        // Rappels passés sans envoi : aucun dans ce jeu.
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
       donorAlert: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     };
@@ -37,9 +39,10 @@ describe('tâche planifiée : rappels envoyés par lots jusqu’à épuisement',
     const alerts = { detectClusters: vi.fn().mockResolvedValue({ created: 0 }) };
     const ticks = { runAll: vi.fn().mockResolvedValue({}) };
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const svc = new ChannelsService(prisma as any, outbox as any, {} as any, alerts as any, ticks as any, {} as any);
+    const svc = new ChannelsService(prisma as any, outbox as any, {} as any, alerts as any, ticks as any, {} as any, {} as any);
     const out = await svc.tick();
     expect(out.remindersSent).toBe(450);
+    expect(out.remindersSkipped).toBe(0);
     expect(prisma.reminder.findMany).toHaveBeenCalledTimes(3);
     expect(prisma.reminder.findMany.mock.calls[0][0].take).toBe(TICK_BATCH);
     expect(outbox.send).toHaveBeenCalledTimes(450);

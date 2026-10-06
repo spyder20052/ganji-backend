@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import type { User } from '@prisma/client';
+import { Prisma, type User } from '@prisma/client';
 import { AuditService } from '../common/audit.service';
 import { AuthUser, CLINICAL_ROLES } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
@@ -12,6 +12,13 @@ import { normalizePhone, RegisterDto } from './auth.dto';
 
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_MAX_ATTEMPTS = 5;
+/** Codes demandés au plus par numéro sur dix minutes. */
+const OTP_MAX_PER_WINDOW = 3;
+const OTP_WINDOW_MS = 10 * 60_000;
+/** Durée d'une session : courte pour les professionnels (poste partagé), une semaine pour les patients. */
+const SESSION_CLINICAL_S = 30 * 60;
+const SESSION_PATIENT_S = 7 * 24 * 3600;
+const GENERIC_OTP_ERROR = 'Code invalide ou expiré';
 
 @Injectable()
 export class AuthService {
@@ -33,9 +40,13 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { phone } });
     if (user) {
       const recent = await this.prisma.otpCode.count({
-        where: { userId: user.id, createdAt: { gt: new Date(Date.now() - 10 * 60_000) } },
+        where: { userId: user.id, createdAt: { gt: new Date(Date.now() - OTP_WINDOW_MS) } },
       });
-      if (recent >= 3) throw new BadRequestException('Trop de codes demandés. Réessayez dans 10 minutes.');
+      if (recent >= OTP_MAX_PER_WINDOW) {
+        // Hors démo : même réponse qu'un envoi réussi, pour ne pas révéler qu'un compte existe.
+        if (!this.demoMode) return { sent: true, expiresInSeconds: OTP_TTL_MS / 1000, simulator: false };
+        throw new BadRequestException('Trop de codes demandés. Réessayez dans 10 minutes.');
+      }
       const code = this.crypto.otp();
       await this.prisma.otpCode.create({
         data: { userId: user.id, codeHash: this.crypto.hmac(`otp:${code}`), expiresAt: new Date(Date.now() + OTP_TTL_MS) },
@@ -50,21 +61,29 @@ export class AuthService {
     }
     // Hors démo, la réponse ne dit jamais si le numéro a un compte (pas d'énumération). En démo, on le dit :
     // sinon une personne dont le compte a été effacé par une remise à zéro attend un code qui ne viendra pas.
-    return { sent: Boolean(user) || !this.demoMode, expiresInSeconds: OTP_TTL_MS / 1000, simulator: this.demoMode, ...(this.demoMode ? { account: Boolean(user) } : {}) };
+    // `demoPhone` : téléphone de démonstration, lisible par tous dans le simulateur ; une vraie inscription
+    // n'y est lisible qu'avec la clé remise à l'inscription (ChannelsService.assertSimulatorPhone).
+    return {
+      sent: Boolean(user) || !this.demoMode,
+      expiresInSeconds: OTP_TTL_MS / 1000,
+      simulator: this.demoMode,
+      ...(this.demoMode ? { account: Boolean(user), demoPhone: Boolean(user?.demoPersona) } : {}),
+    };
   }
 
   async verifyOtp(rawPhone: string, code: string, ip?: string) {
     const phone = normalizePhone(rawPhone);
     const user = await this.prisma.user.findUnique({ where: { phone } });
-    if (!user) throw new UnauthorizedException('Code invalide ou expiré');
+    if (!user) throw new UnauthorizedException(GENERIC_OTP_ERROR);
     const otp = await this.prisma.otpCode.findFirst({
       where: { userId: user.id, usedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: 'desc' },
     });
-    if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) throw new UnauthorizedException('Code invalide ou expiré');
+    if (!otp || otp.attempts >= OTP_MAX_ATTEMPTS) throw new UnauthorizedException(GENERIC_OTP_ERROR);
     if (!this.crypto.safeEqual(otp.codeHash, this.crypto.hmac(`otp:${code}`))) {
       await this.prisma.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
-      throw new UnauthorizedException(`Code incorrect (${OTP_MAX_ATTEMPTS - otp.attempts - 1} essai(s) restant(s))`);
+      // Le nombre d'essais restants n'est dit qu'en démo : hors démo, un numéro connu répond comme un inconnu.
+      throw new UnauthorizedException(this.demoMode ? `Code incorrect (${OTP_MAX_ATTEMPTS - otp.attempts - 1} essai(s) restant(s))` : GENERIC_OTP_ERROR);
     }
     await this.prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: new Date() } });
     if (!user.demoPersona) {
@@ -88,26 +107,37 @@ export class AuthService {
     if (dto.commune && !commune) throw new BadRequestException('Commune inconnue : choisissez-la dans la liste.');
     const birthDate = new Date(dto.birthDate);
     if (Number.isNaN(birthDate.getTime()) || birthDate > new Date() || birthDate.getFullYear() < 1900) throw new BadRequestException('Date de naissance invalide');
-    await this.prisma.user.create({
-      data: {
-        role: 'PATIENT',
-        displayName: `${dto.firstName.trim()} ${dto.lastName.trim()}`,
-        phone,
-        lang: dto.lang ? toLang(dto.lang as UiLang) : 'fr',
-        npiHash,
-        npiLast4: dto.npi.slice(-4),
-        patient: {
-          create: {
-            firstName: dto.firstName.trim(),
-            lastName: dto.lastName.trim(),
-            birthDate,
-            sex: dto.sex,
-            communeId: commune?.id,
+    let user: User;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          role: 'PATIENT',
+          displayName: `${dto.firstName.trim()} ${dto.lastName.trim()}`,
+          phone,
+          lang: dto.lang ? toLang(dto.lang as UiLang) : 'fr',
+          npiHash,
+          npiLast4: dto.npi.slice(-4),
+          patient: {
+            create: {
+              firstName: dto.firstName.trim(),
+              lastName: dto.lastName.trim(),
+              birthDate,
+              sex: dto.sex,
+              communeId: commune?.id,
+            },
           },
         },
-      },
-    });
-    return this.requestOtp(phone);
+      });
+    } catch (e) {
+      // Deux inscriptions simultanées avec le même numéro ou le même NPI : la contrainte unique tranche.
+      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+        throw new BadRequestException('Un compte existe déjà pour ce NPI ou ce numéro. Connectez-vous.');
+      }
+      throw e;
+    }
+    // En démo, le simulateur tient lieu de téléphone : la clé permet à ce navigateur, et à lui seul, d'y lire
+    // les SMS du nouveau carnet (code de connexion, codes de remise).
+    return { ...(await this.requestOtp(phone)), ...(this.demoMode ? { simulatorKey: this.crypto.simulatorKey(user.id) } : {}) };
   }
 
   async demoLogin(persona: string, ip?: string) {
@@ -144,7 +174,7 @@ export class AuthService {
   private async openSession(user: User, ip?: string) {
     const auth = await this.toAuthUser(user);
     const clinical = CLINICAL_ROLES.includes(user.role) || user.role === 'PHARMACIST';
-    const ttlSeconds = clinical ? 30 * 60 : 7 * 24 * 3600;
+    const ttlSeconds = clinical ? SESSION_CLINICAL_S : SESSION_PATIENT_S;
     const { id, ...rest } = auth;
     const token = await this.jwt.signAsync({ sub: id, ...rest }, { expiresIn: ttlSeconds });
     await this.prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });

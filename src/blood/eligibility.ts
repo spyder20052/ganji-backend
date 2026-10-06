@@ -1,7 +1,7 @@
 /**
  * Règles du don de sang (logique pure, testée dans test/blood.spec.ts).
  * Repos entre deux dons de sang total : 8 semaines pour un homme, 12 semaines pour une femme
- * (intervalles minimaux de l'OMS, comme canDonate() de common/geo.ts).
+ * (intervalles minimaux de l'OMS).
  * Âge : 18 à 60 ans. Poids : au moins 50 kg (question facultative, déclarée par le donneur).
  * Contre-indications connues du carnet : grossesse en cours, cancer, maladie du sang, VIH.
  */
@@ -34,12 +34,9 @@ export interface Eligibility {
   age: number | null;
 }
 
-export function ageOn(birth: Date, now = new Date()): number {
-  let a = now.getUTCFullYear() - birth.getUTCFullYear();
-  const m = now.getUTCMonth() - birth.getUTCMonth();
-  if (m < 0 || (m === 0 && now.getUTCDate() < birth.getUTCDate())) a--;
-  return a;
-}
+import { ageOn } from '../common/time';
+
+export { ageOn };
 
 /** Date à partir de laquelle la personne peut redonner (null : jamais donné, donc tout de suite). */
 export function nextDonationDate(lastDonationAt: Date | null, sex: string): Date | null {
@@ -76,16 +73,19 @@ export function boundingBox(lat: number, lng: number, km: number) {
 }
 
 /**
- * Donneurs à alerter : d'abord dans le rayon de 40 km ; si personne n'y est disponible, 80 km,
- * puis 150 km. Renvoie le rayon retenu (null si personne, même à 150 km).
+ * Donneurs à alerter : d'abord dans le rayon de 40 km ; tant qu'on n'y trouve pas `wanted` donneurs
+ * (au moins un), on élargit à 80 km puis 150 km. Renvoie le rayon retenu (null si personne, même à 150 km).
  */
-export function pickByRadius<T extends { km: number }>(candidates: T[], max: number, steps: readonly number[] = RADIUS_STEPS): { chosen: T[]; radiusKm: number | null } {
+export function pickByRadius<T extends { km: number }>(candidates: T[], max: number, steps: readonly number[] = RADIUS_STEPS, wanted = 1): { chosen: T[]; radiusKm: number | null } {
   const sorted = [...candidates].sort((a, b) => a.km - b.km);
+  const need = Math.max(1, Math.min(wanted, max));
+  let best: { chosen: T[]; radiusKm: number | null } = { chosen: [], radiusKm: null };
   for (const r of steps) {
     const inside = sorted.filter((c) => c.km <= r);
-    if (inside.length) return { chosen: inside.slice(0, max), radiusKm: r };
+    if (inside.length) best = { chosen: inside.slice(0, max), radiusKm: r };
+    if (inside.length >= need) break;
   }
-  return { chosen: [], radiusKm: null };
+  return best;
 }
 
 /** Couverture d'une demande : chaque donneur qui dit oui et chaque poche réservée couvre une poche. */

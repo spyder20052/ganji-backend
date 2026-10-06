@@ -30,15 +30,18 @@ npm run dev
 
 | Commande | Effet |
 |----------|-------|
-| `npm test` / `npm run test:cov` | Tests Vitest (consentement, chiffrement, compatibilité sanguine, SMS sans donnée médicale) |
+| `npm test` / `npm run test:cov` | Tests Vitest : règles métier pures (don de sang, ordonnances, commandes, cercle de soins, posologies, i18n, chiffrement) et, **si `DATABASE_URL` est défini**, 4 suites d'intégration sur la vraie base (IDOR, consentement, parcours héros, ordonnance à usage unique, commandes, télé-expertise…). Sans base, ces 35 tests sont ignorés : `docker compose up -d db && npm run db:setup` pour les lancer. |
 | `npm run lint` / `npm run typecheck` | Qualité |
 | `npm run db:seed` | Réinitialise la démo (déterministe) |
+| `npm run i18n:verify` | Textes SMS, voix et notifications : chaque clé traduite en fon, yoruba, bariba, dendi, mêmes variables |
 
 ## Principes
 
 - **Aucune donnée de santé lue sans consentement ou motif d'urgence tracé** : `src/common/access.service.ts` est le point de décision unique ; chaque lecture par un tiers et chaque refus sont écrits dans un journal en ajout seul (trigger PostgreSQL).
 - **Une seule logique métier pour tous les canaux** : web, SMS, USSD et voix appellent les mêmes services.
-- **Aucune donnée médicale dans un SMS** : garde-fou dans `OutboxService`.
+- **Aucune donnée médicale dans un SMS** : garde-fou dans `OutboxService`, vérifié sur tout le catalogue par un test.
+- **Logique métier pure à côté des services** (`*.logic.ts`, `eligibility.ts`, `escalation.ts`, `dosage.ts`) : testée sans base, réutilisée par le jeu de données de démo.
+- **Démo sans porte dérobée** : le simulateur de téléphone ne montre les SMS d'un vrai carnet qu'au navigateur qui l'a créé (clé remise à l'inscription) ; voir `SECURITY.md`.
 
 ## Déploiement Vercel
 

@@ -109,7 +109,6 @@ export const BARIBA: Record<string, string> = {
   'listen.n.urgent.body': 'Tɔnu goo u nɔni swãa baka gari yorua. A nùn wisa gbiikaa.',
   'listen.n.urgent.title': 'Swaa dakibu: nɔni swãa baka',
   'listen.reply': 'Ganji: a labaari kpaa mɔ application sɔɔ.',
-  'maternal.danger': 'Ganji: {prenom} u gura kari yĩreru sɔ̃ɔwa. A nùn soku kpa a ka nùn da maternité.',
   'medications.dispensed': 'Ganji: {pharmacy} ya wunɛn ordonnance tim wɛ̃.',
   'order.accepted': 'Ganji: {pharmacy} ya wunɛn commande {ref} wura. Ba ye sɔɔru mɔ̀.',
   'order.cancelled': 'Ganji: ba commande {ref} deri.',

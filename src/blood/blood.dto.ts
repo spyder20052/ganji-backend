@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsUUID, Max, Min } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from 'class-validator';
 import { BLOOD_GROUPS } from '../common/geo';
 
 export class CreateBloodRequestDto {
@@ -36,6 +36,10 @@ export class DonorProfileDto {
 
 export class ReserveDto {
   @ApiProperty({ example: 2, description: 'Poches à mettre de côté, prises dans le stock du site connecté' }) @IsInt() @Min(1) @Max(10) units: number;
+}
+
+export class CancelRequestDto {
+  @ApiPropertyOptional({ example: 'Patient transféré au CNHU', description: 'Motif, inscrit au journal du patient' }) @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
 export class ServedDto {

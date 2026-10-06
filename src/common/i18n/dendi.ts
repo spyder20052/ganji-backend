@@ -109,7 +109,6 @@ export const DENDI: Record<string, string> = {
   "listen.n.urgent.body": "Boro fo na taabi beeri senni hantum. A tu jina.",
   "listen.n.urgent.title": "Salaŋ : taabi beeri",
   "listen.reply": "Ganji : baaru taji go no ni se application ra.",
-  "maternal.danger": "Ganji : {prenom} ne a gonda gunde hasaraw alaama. A ce, ka koy nda a maternité.",
   "medications.dispensed": "Ganji : {pharmacy} na ni ordonnance safarey no.",
   "order.accepted": "Ganji : {pharmacy} na ni commande {ref} yadda. I go g’a soola.",
   "order.cancelled": "Ganji : commande {ref}, i n’a naŋ.",

@@ -9,4 +9,7 @@ async function bootstrap() {
   await app.listen(port);
   console.log(`API Ganji prête sur http://localhost:${port} (documentation : /docs)`);
 }
-void bootstrap();
+bootstrap().catch((e: unknown) => {
+  console.error('Démarrage de l’API impossible :', e);
+  process.exit(1);
+});

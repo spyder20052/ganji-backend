@@ -7,8 +7,9 @@ import { CryptoService } from '../common/crypto.service';
 import { distanceKm } from '../common/geo';
 import { NotificationsService } from '../common/notifications.service';
 import { note, plural, sms, type TextKey, type Vars } from '../common/i18n';
+import { shortName } from '../common/names';
 import { TickRegistry } from '../common/tick.registry';
-import { prescriptionSignedString, type PrescriptionItem } from '../medications/medications.service';
+import { prescriptionSignedString, type PrescriptionItem } from '../medications/medications.logic';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateOrderDto, OrderOptionsDto } from './orders.dto';
 import {
@@ -84,7 +85,6 @@ const APP: Record<string, { title: TextKey; body: TextKey; noCode?: TextKey; cod
   expired: { title: 'order.n.expired.title', body: 'order.n.expired.body' },
 };
 
-const shortName = (p: { firstName: string; lastName: string }) => `${p.firstName} ${p.lastName.charAt(0)}.`;
 const nf = (n: number) => n.toLocaleString('fr-FR').replace(/ | /g, ' ');
 const now = () => new Date();
 
@@ -302,7 +302,7 @@ export class OrdersService implements OnModuleInit {
     const rows = await this.prisma.order.findMany({ where: { patientId: { in: ids } }, orderBy: { createdAt: 'desc' }, take: 50 });
     // Lecture par un aidant : inscrite une fois par commande au journal du patient.
     await this.auditReads(user, rows.filter((o) => o.patientId !== user.patientId), 'via DELEGATION', ip);
-    return this.presentForPatient(rows);
+    return this.presentForPatient(rows, user, await this.holderPatients(user));
   }
 
   async getMine(user: AuthUser, id: string, ip?: string) {
@@ -310,7 +310,7 @@ export class OrdersService implements OnModuleInit {
     const access = o ? await this.relation(user, o.patientId) : null;
     if (!o || !access) throw new NotFoundException('Commande introuvable');
     if (access.via !== 'OWNER') await this.auditReads(user, [o], `via ${access.via}`, ip);
-    return (await this.presentForPatient([o]))[0];
+    return (await this.presentForPatient([o], user, access.via === 'DELEGATION' ? new Set() : new Set([o.patientId])))[0];
   }
 
   /** Annulation par le patient (ou son aidant) tant que la pharmacie n'a pas accepté ; mobile money remboursé. */
@@ -448,7 +448,12 @@ export class OrdersService implements OnModuleInit {
       where: { id: order.id, status: order.status, codeAttempts: { lt: MAX_CODE_ATTEMPTS } },
       data: { codeAttempts: { increment: 1 } },
     });
-    if (slot !== 1) throw new ForbiddenException('Trop de codes faux : envoyez un nouveau code au patient ou déclarez l’échec de remise.');
+    if (slot !== 1) {
+      // Soit les cinq essais sont consommés, soit la commande a changé de statut entre-temps : on le dit.
+      const fresh = await this.prisma.order.findUnique({ where: { id: order.id }, select: { status: true } });
+      if (fresh && fresh.status !== order.status) throw new ConflictException('La commande vient de changer. Actualisez la page.');
+      throw new ForbiddenException('Trop de codes faux : envoyez un nouveau code au patient ou déclarez l’échec de remise.');
+    }
     if (!checkHandoverCode(order.handoverCode, code)) {
       await this.audit.log({ actor: user, patientId: order.patientId, action: 'DENIED', resource: `Remise de la commande ${orderRef(order.id)}`, reason: 'Code de remise faux', allowed: false, ip });
       const fresh = await this.prisma.order.findUnique({ where: { id: order.id }, select: { codeAttempts: true } });
@@ -649,13 +654,16 @@ export class OrdersService implements OnModuleInit {
     return null;
   }
 
+  /** Patients dont on est « titulaire » des commandes (soi, ses enfants) : eux seuls voient le code de remise. */
+  private async holderPatients(user: AuthUser): Promise<Set<string>> {
+    const children = user.patientId ? await this.prisma.patient.findMany({ where: { parentId: user.patientId }, select: { id: true } }) : [];
+    return new Set([...(user.patientId ? [user.patientId] : []), ...children.map((c) => c.id)]);
+  }
+
   /** Patients dont on suit les commandes : soi, ses enfants, les personnes aidées (volet « commandes »). */
   private async reachablePatients(user: AuthUser): Promise<string[]> {
-    const [children, delegated] = await Promise.all([
-      user.patientId ? this.prisma.patient.findMany({ where: { parentId: user.patientId }, select: { id: true } }) : [],
-      this.prisma.delegation.findMany({ where: { caregiverId: user.id, revokedAt: null, scopes: { hasSome: ORDER_SCOPES } }, select: { patientId: true } }),
-    ]);
-    return [...new Set([...(user.patientId ? [user.patientId] : []), ...children.map((c) => c.id), ...delegated.map((d) => d.patientId)])];
+    const delegated = await this.prisma.delegation.findMany({ where: { caregiverId: user.id, revokedAt: null, scopes: { hasSome: ORDER_SCOPES } }, select: { patientId: true } });
+    return [...new Set([...(await this.holderPatients(user)), ...delegated.map((d) => d.patientId)])];
   }
 
   /**
@@ -849,8 +857,12 @@ export class OrdersService implements OnModuleInit {
     }
   }
 
-  /** Vue patient d'une liste de commandes : pharmacies, communes et paiements lus en trois requêtes. */
-  private async presentForPatient(orders: Order[]) {
+  /**
+   * Vue patient d'une liste de commandes : pharmacies, communes et paiements lus en trois requêtes. Le code de
+   * remise n'est rendu qu'aux titulaires (patient, parent) et à l'auteur de la commande : même règle que les
+   * SMS (notifyFamily), un aidant « commandes » suit la commande sans pouvoir la retirer à la place du patient.
+   */
+  private async presentForPatient(orders: Order[], viewer: AuthUser, holderPatientIds: Set<string>) {
     if (!orders.length) return [];
     const [facilities, communes, payments] = await Promise.all([
       this.prisma.facility.findMany({
@@ -893,7 +905,7 @@ export class OrdersService implements OnModuleInit {
         receipt: pay?.status === 'REUSSI' || pay?.status === 'REMBOURSE' ? pay.receipt : null,
         courierName: o.courierName,
         courierPhone: o.courierPhone,
-        handoverCode: ACTIVE_STATUSES.includes(status) ? o.handoverCode : null,
+        handoverCode: ACTIVE_STATUSES.includes(status) && (holderPatientIds.has(o.patientId) || o.userId === viewer.id) ? o.handoverCode : null,
         refusalReason: o.refusalReason,
         events: (o.events as unknown as OrderEvent[]).filter((e) => e.status in STATUS_LABEL).map((e) => ({ status: e.status, at: e.at })),
         canCancel: status === 'RECUE',

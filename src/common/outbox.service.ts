@@ -15,7 +15,12 @@ export interface OutboundMessage {
 }
 
 /** Mots interdits dans le corps d'un SMS ou d'un appel : aucune donnée médicale ne doit transiter. */
-const FORBIDDEN = /(leuc|vih|hiv|cancer|diagnos|drépano|diab[eè]t|séropos|psychi|grossesse\s+à\s+risque)/i;
+const FORBIDDEN = /(leuc|vih|hiv|sida|cancer|tumeur|diagnos|drépano|diab[eè]t|séropos|psychi|tuberc|hépatit|épilep|hémophil|grossesse\s+à\s+risque)/i;
+
+/** Vrai si un texte contient un terme que la file d'envoi refusera (à vérifier avant d'écrire en base). */
+export function isMedicalText(text: string): boolean {
+  return FORBIDDEN.test(text);
+}
 
 /**
  * File d'envoi SMS / voix / push. En démo, l'agrégateur est simulé : le message
@@ -28,7 +33,7 @@ export class OutboxService {
   constructor(private readonly prisma: PrismaService) {}
 
   async send(msg: OutboundMessage) {
-    if (FORBIDDEN.test(msg.body)) {
+    if (isMedicalText(msg.body)) {
       this.logger.error(`Message bloqué : contenu médical détecté (ref=${msg.ref ?? '-'})`);
       throw new Error('Un SMS ne doit contenir aucune donnée médicale');
     }

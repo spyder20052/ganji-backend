@@ -75,7 +75,8 @@ export interface AncVisitData {
 }
 
 /**
- * Consultations prénatales recentrées (4 CPN) selon le protocole national.
+ * Consultations prénatales recentrées (4 CPN) selon le protocole national : chaque consultation a une
+ * fenêtre de quelques semaines (le rappel vise le début de la fenêtre, le retard se compte à sa fin).
  * NB : l'OMS (recommandations 2016) préconise au moins 8 contacts prénatals ;
  * l'application peut proposer des rappels intermédiaires.
  */
@@ -116,8 +117,8 @@ export const ANC_SCHEDULE: AncVisitData[] = [
   {
     code: 'CPN3',
     label: '3e consultation prénatale',
-    weekFrom: 32,
-    weekTo: 32,
+    weekFrom: 30,
+    weekTo: 34,
     content: [
       'Tension artérielle, poids, hauteur utérine, bruits du cœur fœtal',
       'TPI (SP), dose suivante',
@@ -131,7 +132,7 @@ export const ANC_SCHEDULE: AncVisitData[] = [
     code: 'CPN4',
     label: '4e consultation prénatale',
     weekFrom: 36,
-    weekTo: 36,
+    weekTo: 38,
     content: [
       'Tension artérielle, poids, présentation du bébé',
       'TPI (SP) si dose restante',

@@ -22,6 +22,14 @@ export const BLOOD = defineSms({
     fr: 'Ganji : merci ! Le besoin de sang à {place} est couvert. Inutile de vous déplacer.',
     en: 'Ganji: thank you! The blood need at {place} is covered. No need to come.',
   },
+  'blood.donor.cancelled': {
+    fr: 'Ganji : merci {name}. La demande de {place} est annulée : inutile de vous déplacer. Nous vous rappellerons au prochain besoin.',
+    en: 'Ganji: thank you {name}. The request from {place} is cancelled: no need to come. We will call on you again next time.',
+  },
+  'blood.n.cancelled.title': { fr: 'Demande annulée', en: 'Request cancelled' },
+  'blood.n.cancelled.body': { fr: 'La demande de {place} est annulée. Merci d’avoir répondu : inutile de vous déplacer.', en: 'The request from {place} is cancelled. Thank you for answering: no need to come.' },
+  'blood.n.cancelled.ants.title': { fr: 'Demande annulée · {place}', en: 'Request cancelled · {place}' },
+  'blood.n.cancelled.ants.body': { fr: 'La demande de {product} {group} de {place} est annulée. Les poches réservées sont revenues au stock.', en: 'The {product} {group} request from {place} is cancelled. Reserved units are back in stock.' },
   'blood.donor.gave': {
     fr: 'Ganji : merci pour votre don, {name} ! Vous avez peut-être sauvé une vie. Prochain don possible à partir du {date}.',
     en: 'Ganji: thank you for your donation, {name}! You may have saved a life. You can give again from {date}.',

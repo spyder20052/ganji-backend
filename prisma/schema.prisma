@@ -241,6 +241,7 @@ model Consent {
   source      String // QR | CODE | TEAM | MANUAL
   shareCode   String?   @unique // code court à 6 chiffres
   shareToken  String?   @unique // jeton du QR
+  durationHours Int     @default(24) // durée de l'accès une fois le QR scanné : choisie par le patient, jamais par le soignant
   expiresAt   DateTime
   revokedAt   DateTime?
   redeemedAt  DateTime?
@@ -279,6 +280,8 @@ model Condition {
   sensitive Boolean   @default(false) // compartiment très sensible (VIH, santé mentale, SSR)
   onsetAt   DateTime?
   createdAt DateTime  @default(now())
+
+  @@index([patientId])
 }
 
 /// FHIR Encounter
@@ -324,6 +327,8 @@ model DocumentRef {
   size      Int
   dataB64   String // démo : stocké en base, compressé ≤ 300 Ko ; prod : stockage objet + liens signés
   createdAt DateTime @default(now())
+
+  @@index([patientId, createdAt])
 }
 
 // ─── Parcours chronique ──────────────────────────────────────────────
@@ -338,6 +343,8 @@ model CarePlan {
   goals     String[]
   steps     Json // [{label, dueAt, done}]
   createdAt DateTime @default(now())
+
+  @@index([patientId])
 }
 
 /// FHIR Appointment / CommunicationRequest
@@ -351,6 +358,7 @@ model Reminder {
   dueAt          DateTime
   channels       String[] // APP | SMS | VOICE
   sentAt         DateTime?
+  skippedAt      DateTime? // passé sans avoir été envoyé (créé entre deux passages de la tâche planifiée) : sorti de la file, visible
   confirmedAt    DateTime?
   appointmentId  String? // rappel d'un rendez-vous confirmé
   prescriptionId String? // prise d'un traitement (plan de l'assistant)
@@ -365,11 +373,13 @@ model SymptomLog {
   id        String   @id @default(uuid())
   patientId String
   patient   Patient  @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  symptom   String // fever | pain | bleeding | fatigue | vomiting | breath
+  symptom   String // fever | pain | bleeding | fatigue | vomiting | breath | bruise | other
   severity  Int // 1..3
   note      String?
   alert     Boolean  @default(false)
   at        DateTime @default(now())
+
+  @@index([patientId, at])
 }
 
 // ─── Sang ────────────────────────────────────────────────────────────
@@ -400,11 +410,15 @@ model BloodRequest {
   quantity       Int
   urgency        String // VITALE | URGENTE | PROGRAMMEE
   neededBy       DateTime
-  status         String       @default("OUVERTE") // OUVERTE | DONNEURS_ALERTES | DONNEUR_TROUVE | POCHES_RESERVEES | SERVIE | ANNULEE
+  status         String       @default("OUVERTE") // OUVERTE → DONNEURS_ALERTES → DONNEUR_TROUVE → POCHES_RESERVEES (besoin couvert) → SERVIE ; ANNULEE à tout moment avant SERVIE (voir blood.logic.ts)
   reservedUnits  Int          @default(0) // poches mises de côté par la banque de sang (déjà retirées de son stock)
   reservedSiteId String? // site de transfusion qui a réservé
   createdAt      DateTime     @default(now())
   alerts         DonorAlert[]
+
+  @@index([status, createdAt])
+  @@index([requesterId, createdAt])
+  @@index([patientId, createdAt])
 }
 
 model Donor {
@@ -445,6 +459,7 @@ model DonorAlert {
   createdAt   DateTime     @default(now())
 
   @@unique([requestId, donorId])
+  @@index([donorId, status])
 }
 
 // ─── Médicaments ─────────────────────────────────────────────────────
@@ -477,6 +492,8 @@ model Prescription {
   dispensedAt     DateTime?
   dispensedById   String?
   dispensedByName String?
+
+  @@index([patientId, issuedAt])
 }
 
 // ─── Télé-expertise ──────────────────────────────────────────────────
@@ -498,6 +515,10 @@ model TeleExpertise {
   answeredByName String?
   answeredAt     DateTime?
   createdAt      DateTime  @default(now())
+
+  @@index([specialty, status, createdAt])
+  @@index([requesterId, createdAt])
+  @@index([patientId, status])
 }
 
 // ─── Mère et enfant ──────────────────────────────────────────────────
@@ -525,6 +546,8 @@ model AncVisit {
   dueTo       DateTime
   doneAt      DateTime?
   place       String?
+
+  @@index([pregnancyId])
 }
 
 /// FHIR Immunization
@@ -539,6 +562,8 @@ model Immunization {
   givenAt     DateTime?
   lot         String?
   place       String?
+
+  @@index([patientId, dueAt])
 }
 
 // ─── Santé publique ──────────────────────────────────────────────────
@@ -626,6 +651,7 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt, createdAt])
+  @@index([kind, href])
 }
 
 // ─── Rendez-vous ─────────────────────────────────────────────────────
@@ -675,7 +701,7 @@ model Order {
   phone           String
   instructions    String?
   payment         String // ESPECES | MOBILE_MONEY
-  paymentStatus   String   @default("A_PAYER") // A_PAYER | PAYE
+  paymentStatus   String   @default("A_PAYER") // A_PAYER | PAYE | REMBOURSE (mobile money rendu après annulation, refus ou échec)
   status          String   @default("RECUE") // RECUE | ACCEPTEE | PRETE | EN_LIVRAISON | LIVREE | RETIREE | REFUSEE | ANNULEE | ECHEC
   courierName     String?
   courierPhone    String?
@@ -688,6 +714,7 @@ model Order {
 
   @@index([pharmacyId, status])
   @@index([patientId, createdAt])
+  @@index([prescriptionId, status])
 }
 
 // ─── Écoute psychologique ────────────────────────────────────────────
@@ -758,9 +785,12 @@ model Payment {
   amountFcfa Int
   provider   String // MTN_MOMO | MOOV_MONEY | CELTIIS_CASH | ESPECES
   phone      String?
-  status     String   @default("EN_COURS") // EN_COURS | REUSSI | ECHOUE
+  status     String   @default("EN_COURS") // EN_COURS | REUSSI | ECHOUE | REMBOURSE
   receipt    String   @unique // numéro de reçu
   createdAt  DateTime @default(now())
+
+  @@index([ref])
+  @@index([patientId, createdAt])
 }
 
 // ─── Assistant de traitement et cercle de soins ──────────────────────

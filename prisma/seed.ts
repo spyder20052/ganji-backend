@@ -13,7 +13,7 @@ import { COMMUNES, DEPARTMENTS } from '../src/data/geo';
 import { FACILITIES } from '../src/data/facilities';
 import { MEDICATIONS } from '../src/data/medications';
 import { ANC_SCHEDULE, VACCINE_SCHEDULE } from '../src/data/vaccines';
-import { prescriptionSignedString } from '../src/medications/medications.service';
+import { prescriptionSignedString } from '../src/medications/medications.logic';
 
 import { seedExtensions } from './seed-ext';
 
@@ -477,12 +477,14 @@ async function main() {
   // Donneur de démonstration du parcours héros : téléphone simple, le plus proche du CNHU-HKM.
   donors.unshift({ firstName: 'Rodrigue', phone: '0196000000', bloodGroup: 'O+', sex: 'M', lat: 6.3585, lng: 2.4201, city: 'Cotonou', lastDonationAt: daysAgo(140), available: true, hasSmartphone: false, lang: 'fon', donations: 6 });
   await prisma.donor.createMany({ data: donors });
-  // Afiavi est aussi donneuse (O+), mais a donné récemment : elle ne doit pas être sollicitée.
+  // Afiavi est aussi donneuse (O+). Au seed initial elle a donné il y a 20 jours (repos) ; le jeu étendu
+  // (seed-ext/blood.ts) la rend de nouveau éligible pour qu'elle voie les demandes proches.
   await prisma.donor.create({ data: { userId: users.afiavi.id, firstName: 'Afiavi', phone: P.afiavi.phone, bloodGroup: 'O+', sex: 'F', lat: 6.45, lng: 2.35, city: 'Abomey-Calavi', lastDonationAt: daysAgo(20), available: true, hasSmartphone: true, lang: 'fon', donations: 3 } });
 
   // ─── 11. Historique sang (indicateurs du tableau de bord) ───
-  const allDonors = await prisma.donor.findMany({ take: 60, where: { city: { in: ['Cotonou', 'Parakou'] } } });
-  const secondaries = await prisma.patient.findMany({ where: { userId: null, parentId: null }, take: 12 });
+  // Ordres explicites : le jeu de données reste le même d'un déploiement à l'autre.
+  const allDonors = await prisma.donor.findMany({ take: 60, where: { city: { in: ['Cotonou', 'Parakou'] } }, orderBy: { phone: 'asc' } });
+  const secondaries = await prisma.patient.findMany({ where: { userId: null, parentId: null }, take: 12, orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }] });
   for (let i = 0; i < 10; i++) {
     const created = daysAgo(int(2, 28), int(7, 20));
     const site = pick([fac('CNHU-HKM'), fac('CHUD-BA'), fac('CHU-MEL (ex-HOMEL)'), fac('CHUD-OP')]);

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { boundingBox, canDonateNow, contraindicationOf, coverage, eligibility, nextDonationDate, pickByRadius, planStockDraw } from '../src/blood/eligibility';
-import { canDonate, distanceKm } from '../src/common/geo';
+import { boundingBox, canDonateNow, contraindicationOf, coverage, eligibility, nextDonationDate, pickByRadius, planStockDraw, REST_DAYS } from '../src/blood/eligibility';
+import { distanceKm } from '../src/common/geo';
 
 const NOW = new Date('2026-09-26T10:00:00Z');
 const daysAgo = (d: number) => new Date(NOW.getTime() - d * 86_400_000);
 
 describe('M4 · règles du don de sang', () => {
-  it('impose 8 semaines de repos à un homme et 12 semaines à une femme (même règle que canDonate)', () => {
+  it('impose 8 semaines de repos à un homme et 12 semaines à une femme', () => {
     expect(eligibility({ lastDonationAt: daysAgo(57), sex: 'M' }, NOW).eligible).toBe(true);
     expect(eligibility({ lastDonationAt: daysAgo(55), sex: 'M' }, NOW).reason).toBe('REST');
     const woman = eligibility({ lastDonationAt: daysAgo(70), sex: 'F' }, NOW);
@@ -15,7 +15,7 @@ describe('M4 · règles du don de sang', () => {
     expect(eligibility({ lastDonationAt: daysAgo(85), sex: 'F' }, NOW).eligible).toBe(true);
     expect(eligibility({ lastDonationAt: null, sex: 'F' }, NOW)).toMatchObject({ eligible: true, nextDate: null });
     for (const [days, sex] of [[55, 'M'], [57, 'M'], [83, 'F'], [85, 'F']] as const) {
-      expect(canDonateNow(daysAgo(days), sex, null, null, NOW)).toBe(canDonate(daysAgo(days), sex, NOW));
+      expect(canDonateNow(daysAgo(days), sex, null, null, NOW)).toBe(days >= REST_DAYS[sex]);
     }
   });
 

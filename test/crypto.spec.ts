@@ -12,11 +12,13 @@ describe('CryptoService', () => {
     expect(c.decrypt(a)).toBe('Leucémie myéloïde chronique');
   });
 
-  it('détecte toute altération du chiffré', () => {
+  it('ne rend jamais une valeur altérée : null plutôt qu’un texte faux ou une erreur 500', () => {
     const a = c.encrypt('secret')!;
     const parts = a.split('.');
     parts[3] = Buffer.from('autre').toString('base64url');
-    expect(() => c.decrypt(parts.join('.'))).toThrow();
+    expect(c.decrypt(parts.join('.'))).toBeNull();
+    expect(c.decrypt('v1.pas.un.chiffré')).toBeNull();
+    expect(c.decrypt('n’importe quoi')).toBeNull();
   });
 
   it('hache le NPI de façon stable sans le révéler', () => {

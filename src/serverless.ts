@@ -8,10 +8,17 @@ let cached: Promise<Handler> | null = null;
 /** Point d'entrée Vercel : l'application Nest est initialisée une fois par instance puis réutilisée. */
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   if (!cached) {
-    cached = createApp().then(async (app) => {
-      await app.init();
-      return app.getHttpAdapter().getInstance() as Handler;
-    });
+    cached = createApp()
+      .then(async (app) => {
+        await app.init();
+        return app.getHttpAdapter().getInstance() as Handler;
+      })
+      .catch((e: unknown) => {
+        // Démarrage raté (base injoignable, variable manquante) : on réessaie à la requête suivante au lieu
+        // de garder une promesse rejetée jusqu'au prochain démarrage à froid.
+        cached = null;
+        throw e;
+      });
   }
   const express = await cached;
   express(req, res);

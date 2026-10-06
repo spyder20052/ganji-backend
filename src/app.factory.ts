@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 
@@ -15,22 +16,17 @@ export async function createApp(): Promise<INestApplication> {
   http.set('trust proxy', 1);
   http.disable('x-powered-by');
 
-  app.use(
+  // Une API JSON n'exécute rien dans un navigateur : CSP « rien » partout, sauf sur /docs où Swagger UI a besoin
+  // de ses scripts et styles en ligne.
+  const headers = (csp: Record<string, string[]>) =>
     helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          // Swagger UI a besoin de styles et scripts en ligne sur /docs uniquement.
-          scriptSrc: ["'self'", "'unsafe-inline'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-          imgSrc: ["'self'", 'data:'],
-          frameAncestors: ["'none'"],
-        },
-      },
+      contentSecurityPolicy: { directives: { ...csp, frameAncestors: ["'none'"], baseUri: ["'none'"], formAction: ["'none'"] } },
       hsts: { maxAge: 63072000, includeSubDomains: true, preload: true },
       referrerPolicy: { policy: 'no-referrer' },
-    }),
-  );
+    });
+  const apiHeaders = headers({ defaultSrc: ["'none'"] });
+  const docsHeaders = headers({ defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'"], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:'] });
+  app.use((req: Request, res: Response, next: NextFunction) => (req.path.startsWith('/docs') ? docsHeaders : apiHeaders)(req, res, next));
   app.use(cookieParser());
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true, transformOptions: { enableImplicitConversion: true } }),

@@ -3,13 +3,14 @@ import type { Reminder } from '@prisma/client';
 import { AccessService } from '../common/access.service';
 import { AuditService } from '../common/audit.service';
 import type { AuthUser } from '../common/auth-user';
+import { withoutRole } from '../common/names';
 import { NotificationsService } from '../common/notifications.service';
 import { note, sms } from '../common/i18n';
+import { beninDay } from '../common/time';
 import { TickRegistry } from '../common/tick.registry';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CircleSettingsDto } from './circle.dto';
 import {
-  beninDay,
   CAREGIVERS_AFTER_HOURS,
   canConfirm,
   ESCALATED_KINDS,
@@ -27,10 +28,7 @@ export const VISIT_REASON = 'Rappel resté sans réponse : passer prendre des no
 /** Relais prévenus au plus, quand la commune n'en a pas (même repli que les secours de proximité). */
 const MAX_RELAYS = 3;
 
-/** « Mathieu Gounou (relais) » → « Mathieu Gounou ». */
-function shortName(displayName: string) {
-  return displayName.replace(/\s*\([^)]*\)\s*$/, '').trim();
-}
+const shortName = withoutRole;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Lien de la notification « rappel sans réponse » : il sert aussi à retrouver qui a été prévenu. */
 const missedHref = (patientId: string, reminderId: string) => `/app/cercle?p=${patientId}&r=${reminderId}`;
@@ -72,14 +70,15 @@ export class CircleService implements OnModuleInit {
 
   /**
    * Relais de la commune du patient. Simplification assumée (comme les secours de proximité) : un relais
-   * est rattaché à sa commune par son propre carnet (Patient.communeId) ; si la commune n'en a pas encore,
-   * les premiers relais inscrits sont sollicités. En production : table d'affectation relais ↔ villages.
+   * est rattaché à sa commune par son propre carnet (Patient.communeId). En démonstration seulement, une
+   * commune sans relais retombe sur les premiers relais de la démo. En production : table d'affectation
+   * relais ↔ villages, et aucun repli hors de la commune.
    */
   async relaysFor(communeId: string | null) {
     const select = { id: true, displayName: true, phone: true, patient: { select: { commune: { select: { name: true } } } } } as const;
     let rows = communeId ? await this.prisma.user.findMany({ where: { role: 'RELAY', patient: { is: { communeId } } }, select, orderBy: { createdAt: 'asc' }, take: MAX_RELAYS }) : [];
     const local = rows.length > 0;
-    if (!local) rows = await this.prisma.user.findMany({ where: { role: 'RELAY' }, select, orderBy: { createdAt: 'asc' }, take: MAX_RELAYS });
+    if (!local && process.env.DEMO_MODE === 'true') rows = await this.prisma.user.findMany({ where: { role: 'RELAY' }, select, orderBy: { createdAt: 'asc' }, take: MAX_RELAYS });
     return rows.map((u) => ({ id: u.id, name: shortName(u.displayName), hasPhone: Boolean(u.phone), commune: u.patient?.commune?.name ?? null, local }));
   }
 

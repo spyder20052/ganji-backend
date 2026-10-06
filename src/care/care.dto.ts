@@ -3,6 +3,10 @@ import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUUID, Lengt
 
 export const SYMPTOMS = ['fever', 'pain', 'bleeding', 'fatigue', 'vomiting', 'breath', 'bruise', 'other'] as const;
 
+export class PatientQueryDto {
+  @ApiPropertyOptional({ description: 'Par défaut : le carnet de la personne connectée' }) @IsOptional() @IsUUID() patientId?: string;
+}
+
 export class SymptomDto {
   @ApiProperty({ enum: SYMPTOMS }) @IsIn(SYMPTOMS) symptom: string;
   @ApiProperty({ minimum: 1, maximum: 3, description: '1 léger, 2 moyen, 3 fort' }) @IsInt() @Min(1) @Max(3) severity: number;

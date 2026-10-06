@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { CryptoService } from '../../src/common/crypto.service';
-import { prescriptionSignedString, type PrescriptionItem } from '../../src/medications/medications.service';
+import { prescriptionSignedString, type PrescriptionItem } from '../../src/medications/medications.logic';
 import { orderRef } from '../../src/orders/orders.logic';
 import type { SeedCtx } from './context';
 

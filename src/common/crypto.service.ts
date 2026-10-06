@@ -38,13 +38,18 @@ export class CryptoService {
     return ['v1', iv.toString('base64url'), tag.toString('base64url'), data.toString('base64url')].join('.');
   }
 
+  /** Déchiffre un champ ; une valeur altérée ou chiffrée avec une autre clé donne null (jamais une erreur 500). */
   decrypt(payload: string | null | undefined): string | null {
     if (!payload) return null;
     const [v, iv, tag, data] = payload.split('.');
     if (v !== 'v1' || !iv || !tag || !data) return null;
-    const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'));
-    decipher.setAuthTag(Buffer.from(tag, 'base64url'));
-    return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+    try {
+      const decipher = createDecipheriv('aes-256-gcm', this.key, Buffer.from(iv, 'base64url'));
+      decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+      return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+    } catch {
+      return null;
+    }
   }
 
   hmac(value: string): string {
@@ -67,6 +72,14 @@ export class CryptoService {
 
   otp(): string {
     return randomInt(0, 1_000_000).toString().padStart(6, '0');
+  }
+
+  /**
+   * Clé du simulateur de téléphone (mode démo) : remise une seule fois à l'inscription, dérivée du compte,
+   * jamais stockée. Elle permet au navigateur qui a créé un carnet d'en lire les SMS dans le simulateur.
+   */
+  simulatorKey(userId: string): string {
+    return this.hmac(`sim:${userId}`);
   }
 
   safeEqual(a: string, b: string): boolean {

@@ -5,12 +5,12 @@ import { AuditService } from '../common/audit.service';
 import { AuthUser } from '../common/auth-user';
 import { CryptoService } from '../common/crypto.service';
 import { sms } from '../common/i18n';
+import { DAY_MS, fmtDateFr, startOfBeninDay } from '../common/time';
 import { ANC_SCHEDULE, DANGER_SIGNS_PREGNANCY, VACCINE_SCHEDULE } from '../data/vaccines';
 import { RespondersService } from '../emergency/responders.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImmunizationGivenDto } from './maternal.dto';
 
-const DAY_MS = 86_400_000;
 /** Un vaccin non fait est « en retard » 14 jours après la date prévue. */
 const OVERDUE_GRACE_MS = 14 * DAY_MS;
 const VAX_PAYLOAD = /^(?:ganji:vax:)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.([A-Za-z0-9_-]{16,64})$/i;
@@ -49,8 +49,10 @@ function proofString(childId: string, codes: string[]): string {
   return `vax|${childId}|${codes.join(',')}`;
 }
 
-function fmtDate(d: Date) {
-  return d.toLocaleDateString('fr-FR', { timeZone: 'Africa/Porto-Novo', day: 'numeric', month: 'long', year: 'numeric' });
+/** Une consultation est « en retard » le lendemain (heure du Bénin) de la fin de sa fenêtre, pas à la minute près. */
+function ancStatus(v: { doneAt: Date | null; dueTo: Date }, now: Date): AncStatus {
+  if (v.doneAt) return 'faite';
+  return startOfBeninDay(v.dueTo).getTime() + DAY_MS <= now.getTime() ? 'en retard' : 'à venir';
 }
 
 @Injectable()
@@ -84,7 +86,7 @@ export class MaternalService {
     const weeks = Math.floor(days / 7);
     const visits = p.visits.map((v) => {
       const ref = ANC_BY_CODE.get(v.code);
-      const status: AncStatus = v.doneAt ? 'faite' : v.dueTo < now ? 'en retard' : 'à venir';
+      const status = ancStatus(v, now);
       return {
         id: v.id,
         code: v.code,
@@ -131,8 +133,16 @@ export class MaternalService {
     if (!pregnancy) throw new NotFoundException('Grossesse introuvable');
     if (pregnancy.status !== 'EN_COURS') throw new BadRequestException('Ce suivi de grossesse est clôturé');
     const patient = pregnancy.patient;
-    // Les relais communautaires signalent pour les femmes qu'ils accompagnent, sans accès au dossier.
-    if (user.role !== 'RELAY') await this.access.assert(user, patient.id, 'summary', 'Signalement de signe de danger', ip);
+    if (user.role === 'RELAY') {
+      // Un relais signale pour les femmes de sa commune, sans accès au dossier ; jamais pour une inconnue.
+      const relay = await this.prisma.patient.findUnique({ where: { userId: user.id }, select: { communeId: true } });
+      if (!relay?.communeId || relay.communeId !== patient.communeId) {
+        await this.audit.log({ actor: user, patientId: patient.id, action: 'DENIED', resource: 'Signalement de signe de danger', reason: 'Relais d’une autre commune', allowed: false, ip });
+        throw new ForbiddenException('Vous ne pouvez signaler que pour les femmes de votre commune.');
+      }
+    } else {
+      await this.access.assert(user, patient.id, 'summary', 'Signalement de signe de danger', ip);
+    }
 
     const signs = codes.map((code) => {
       const sign = DANGER_BY_CODE.get(code);
@@ -159,9 +169,10 @@ export class MaternalService {
     let notified = 0;
     if (urgent) {
       const recipients = [...(await this.responders.relays(patient.communeId)), ...(await this.responders.caregivers(patient.id))];
+      // Le SMS ne dit ni grossesse ni signe : « a besoin d'aide, accompagnez-la » (relais et aidants).
       notified = await this.responders.notify(
         recipients,
-        (lang) => sms('maternal.danger', lang, { prenom: patient.firstName }),
+        (lang) => sms('maternal.help', lang, { prenom: patient.firstName }),
         `danger-sign:${pregnancy.id}`,
       );
     }
@@ -298,7 +309,7 @@ export class MaternalService {
     });
     if (!recorded) {
       const current = await this.prisma.immunization.findUniqueOrThrow({ where: { id: imm.id } });
-      throw new ConflictException(`Vaccin déjà enregistré le ${fmtDate(current.givenAt ?? givenAt)}${current.place ? ` (${current.place})` : ''}.`);
+      throw new ConflictException(`Vaccin déjà enregistré le ${fmtDateFr(current.givenAt ?? givenAt)}${current.place ? ` (${current.place})` : ''}.`);
     }
 
     await this.audit.log({ actor: user, patientId: imm.patientId, action: 'WRITE', resource: `Vaccination ${imm.vaccineCode}`, ip });

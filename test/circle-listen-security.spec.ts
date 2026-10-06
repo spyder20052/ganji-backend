@@ -3,7 +3,7 @@
  * confirmation d'un rappel (rôle, droit « rappels », fenêtre, journal), noms de médicaments masqués,
  * réglage des aidants sans perte de droits, journal des lectures de l'écoutante, pagination.
  */
-import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { ChannelsService } from '../src/channels/channels.service';
 import { CircleService, genericTitle } from '../src/circle/circle.service';
@@ -23,15 +23,15 @@ describe('Simulateur SMS : numéros de démonstration seulement', () => {
     { id: '3', to: '0197123456', body: 'Code 654321' }, // vraie inscription
     { id: '4', to: '0196000123', body: 'Appel au don' }, // donneur relié à un vrai compte
   ];
+  const users = [
+    { id: 'u-koffi', phone: '0190000001', demoPersona: 'koffi' },
+    { id: 'u-real', phone: '0197123456', demoPersona: null },
+    { id: 'u-donor', phone: '0196000123', demoPersona: null },
+  ];
   const prisma = {
     user: {
-      findMany: vi.fn(async ({ where }: { where: { phone: { in: string[] } } }) =>
-        [
-          { phone: '0190000001', demoPersona: 'koffi' },
-          { phone: '0197123456', demoPersona: null },
-          { phone: '0196000123', demoPersona: null },
-        ].filter((u) => where.phone.in.includes(u.phone)),
-      ),
+      findMany: vi.fn(async ({ where }: { where: { phone: { in: string[] } } }) => users.filter((u) => where.phone.in.includes(u.phone))),
+      findUnique: vi.fn(async ({ where }: { where: { phone: string } }) => users.find((u) => u.phone === where.phone) ?? null),
     },
     donor: {
       findMany: vi.fn(async ({ where }: { where: { phone: { in: string[] }; userId: null } }) =>
@@ -42,15 +42,21 @@ describe('Simulateur SMS : numéros de démonstration seulement', () => {
       findMany: vi.fn(async ({ where }: { where?: { to: string } }) => (where ? outboxRows.filter((r) => r.to === where.to) : outboxRows)),
     },
   };
-  const svc = new ChannelsService(prisma as never, {} as never, {} as never, {} as never, { register: vi.fn() } as never, {} as never);
+  // Clé du simulateur dérivée du compte (CryptoService.simulatorKey) ; comparaison en temps constant.
+  const crypto = { simulatorKey: (id: string) => `cle-${id}`, safeEqual: (a: string, b: string) => a === b };
+  const svc = new ChannelsService(prisma as never, {} as never, {} as never, {} as never, { register: vi.fn() } as never, {} as never, crypto as never);
 
   it('persona et donneur simulé : visibles (parcours héros avec Rodrigue)', async () => {
     expect(await svc.outboxFor('0190000001')).toHaveLength(1);
     expect(await svc.outboxFor('01 96 00 00 00')).toHaveLength(1);
   });
 
-  it('un numéro saisi explicitement voit ses messages (seul moyen de recevoir son code en démo)', async () => {
-    expect(await svc.outboxFor('0197123456')).toHaveLength(1);
+  it('une vraie inscription n’est visible qu’avec la clé remise à l’inscription (sinon son code de connexion serait lisible par tous)', async () => {
+    await expect(svc.outboxFor('0197123456')).rejects.toBeInstanceOf(NotFoundException);
+    await expect(svc.outboxFor('0197123456', 'cle-fausse')).rejects.toBeInstanceOf(NotFoundException);
+    expect(await svc.outboxFor('0197123456', 'cle-u-real')).toHaveLength(1);
+    // Un donneur relié à un vrai compte n'est pas un téléphone de démonstration non plus.
+    await expect(svc.outboxFor('0196000123')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('le fil public ne contient que les numéros de démonstration', async () => {

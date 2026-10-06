@@ -64,6 +64,8 @@ export class AuthController {
     return s.user;
   }
 
+  /** Publique : une session déjà expirée doit pouvoir effacer son cookie. */
+  @Public()
   @Post('logout')
   @HttpCode(200)
   logout(@Res({ passthrough: true }) res: Response) {

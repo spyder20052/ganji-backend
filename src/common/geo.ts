@@ -25,9 +25,3 @@ export function compatibleDonorGroups(recipient: string): string[] {
   return COMPAT[recipient] ?? [recipient];
 }
 
-/** Délai minimal entre deux dons de sang total (jours) : 8 semaines hommes, 12 semaines femmes. */
-export function canDonate(lastDonationAt: Date | null, sex: string, now = new Date()): boolean {
-  if (!lastDonationAt) return true;
-  const days = (now.getTime() - lastDonationAt.getTime()) / 86_400_000;
-  return days >= (sex === 'F' ? 84 : 56);
-}

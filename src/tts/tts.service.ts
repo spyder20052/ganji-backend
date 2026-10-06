@@ -13,6 +13,8 @@ const MODELS_URL = process.env.TTS_MODELS_URL ?? 'https://github.com/spyder20052
 /** Dossier local des modèles : TTS_MODEL_DIR en développement, sinon /tmp (seul dossier inscriptible sur Vercel). */
 const MODEL_DIR = process.env.TTS_MODEL_DIR ?? '/tmp/ganji-tts';
 export const MAX_CHARS = 1500;
+/** Textes gardés en cache au plus (environ 4 Ko par seconde de voix) : la route est publique, la base ne doit pas grossir sans fin. */
+const MAX_CACHED_CLIPS = 5000;
 
 /**
  * Voix de synthèse en fon, yoruba, bariba et dendi : lit le texte réel de la page dans la langue choisie.
@@ -44,7 +46,10 @@ export class TtsService {
     }
     if (!pieces.length) throw new ServiceUnavailableException('Rien à lire dans cette langue');
     const data = encodeMp3(pieces, rate);
-    await this.prisma.ttsClip.upsert({ where: { key }, update: {}, create: { key, lang, chars: text.length, mime: 'audio/mpeg', data: new Uint8Array(data) } }).catch(() => undefined);
+    // Cache plafonné : au-delà, le texte est lu mais pas gardé (un anonyme ne remplit pas la base).
+    if ((await this.prisma.ttsClip.count()) < MAX_CACHED_CLIPS) {
+      await this.prisma.ttsClip.upsert({ where: { key }, update: {}, create: { key, lang, chars: text.length, mime: 'audio/mpeg', data: new Uint8Array(data) } }).catch(() => undefined);
+    }
     return { data, cached: false };
   }
 

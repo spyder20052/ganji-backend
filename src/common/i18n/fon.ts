@@ -126,7 +126,6 @@ export const FON: Record<string, string> = {
   'listen.reply': 'Ganji : mi ɖó wěn yɔ̌yɔ́ ɖé ɖò application ɔ mɛ.',
 
   // Grossesse
-  'maternal.danger': 'Ganji : {prenom} ɖɔ nǔ e nɔ xlɛ́ afɔku xo tɔn é ɖé. Mi ylɔ́ ɛ bo kplá ɛ yi maternité.',
 
   // Médicaments
   'medications.dispensed': 'Ganji : {pharmacy} na amasin ordonnance mitɔn tɔn.',
