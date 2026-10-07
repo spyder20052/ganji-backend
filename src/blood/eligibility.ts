@@ -111,3 +111,8 @@ export function planStockDraw(rows: { bloodGroup: string; units: number }[], rec
   }
   return { draw, missing: left };
 }
+
+/** Ce qu'il faut du carnet d'un donneur relié à un compte pour vérifier qu'il peut donner (voir contraindicationOf). */
+export const DONOR_HEALTH = {
+  user: { select: { patient: { select: { birthDate: true, conditions: { select: { code: true } }, pregnancies: { where: { status: 'EN_COURS' }, select: { id: true } } } } } },
+} as const;

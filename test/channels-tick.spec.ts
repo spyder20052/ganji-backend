@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 // Services voisins remplacés : seul l'envoi des rappels par lots est testé ici.
-vi.mock('../src/blood/blood.service', () => ({ BloodService: class {} }));
+vi.mock('../src/blood/blood-donors.service', () => ({ BloodDonorsService: class {} }));
 vi.mock('../src/alerts/alerts.service', () => ({ AlertsService: class {} }));
 vi.mock('../src/circle/circle.service', () => ({ CircleService: class {} }));
 

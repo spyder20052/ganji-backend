@@ -79,3 +79,27 @@ export function donorChannel(d: Pick<Donor, 'hasSmartphone' | 'lang' | 'userId'>
 export function wantsVoice(d: Pick<Donor, 'hasSmartphone' | 'lang'>): boolean {
   return !d.hasSmartphone && d.lang !== 'fr' && d.lang !== 'en';
 }
+
+// ─── Constantes partagées par les services du module ─────────────
+
+/** Donneurs alertés au plus pour une demande. */
+export const MAX_ALERTS = 14;
+/** Stock « proche » d'un hôpital : sites de transfusion à moins de 60 km. */
+export const STOCK_RADIUS_KM = 60;
+/** Échéance par défaut d'une demande sans date : le lendemain à la même heure. */
+export const DEFAULT_NEEDED_BY_MS = 24 * 3600_000;
+/** Une demande dont l'échéance est passée depuis plus de six heures n'est plus proposée aux donneurs. */
+export const NEARBY_GRACE_MS = 6 * 3600_000;
+export const URGENCY_RANK: Record<string, number> = { VITALE: 0, URGENTE: 1, PROGRAMMEE: 2 };
+
+export const INELIGIBLE_MESSAGE: Record<string, string> = {
+  TOO_YOUNG: 'Il faut avoir au moins 18 ans pour donner son sang.',
+  TOO_OLD: 'Au-delà de 60 ans, le don n’est plus possible. Merci de votre générosité !',
+  WEIGHT: 'Il faut peser au moins 50 kg pour donner son sang. Merci de votre générosité !',
+  PREGNANCY: 'Pas de don de sang pendant la grossesse. Vos proches peuvent donner.',
+  CONDITION: 'Votre santé ne permet pas le don pour le moment. Vos proches peuvent donner pour vous.',
+};
+
+export type Place = { shortName: string | null; name: string };
+/** Nom court d'un établissement s'il en a un, sinon son nom complet. */
+export const placeOf = (f: Place) => f.shortName ?? f.name;

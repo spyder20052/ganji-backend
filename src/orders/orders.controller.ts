@@ -5,6 +5,7 @@ import type { Request } from 'express';
 import { AuthUser, CurrentUser, Roles } from '../common/auth-user';
 import { CreateOrderDto, DeliverOrderDto, DispatchOrderDto, FailOrderDto, MyOrdersQueryDto, OrderOptionsDto, PharmacyOrdersQueryDto, RefuseOrderDto } from './orders.dto';
 import { OrdersService } from './orders.service';
+import { PharmacyOrdersService } from './pharmacy-orders.service';
 
 @ApiTags('Commandes · patient')
 @Roles('PATIENT', 'CAREGIVER')
@@ -44,7 +45,7 @@ export class MyOrdersController {
 @Roles('PHARMACIST')
 @Controller('pharmacy/orders')
 export class PharmacyOrdersController {
-  constructor(private readonly svc: OrdersService) {}
+  constructor(private readonly svc: PharmacyOrdersService) {}
 
   @Get()
   list(@CurrentUser() u: AuthUser, @Query() q: PharmacyOrdersQueryDto, @Req() req: Request) {

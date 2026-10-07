@@ -166,3 +166,21 @@ export function splitRecipients(family: string[], delegates: string[], ordererId
   if (family.includes(ordererId) || delegates.includes(ordererId)) holders.add(ordererId);
   return { holders: [...holders], others: [...new Set(delegates)].filter((id) => !holders.has(id)) };
 }
+
+// ─── Partagé par les services du module ──────────────────────────
+
+/** Ligne de commande telle que stockée (JSON). */
+export interface OrderItem {
+  medicationId: string;
+  dci: string;
+  form: string;
+  strength: string;
+  quantity: number;
+  unitPriceFcfa: number;
+}
+
+/** Volets de délégation qui permettent de commander pour la personne et de suivre ses commandes. */
+export const ORDER_SCOPES = ['orders', 'prescriptions', 'all'];
+
+/** Montant en francs CFA avec séparateur de milliers lisible dans un SMS (espace simple). */
+export const nf = (n: number) => n.toLocaleString('fr-FR').replace(/[\u202f\u00a0]/g, ' ');

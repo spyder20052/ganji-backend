@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Lang } from '@prisma/client';
 import { DONOR_ALERT_TTL_MS } from '../blood/blood.logic';
-import { BloodService } from '../blood/blood.service';
+import { BloodDonorsService } from '../blood/blood-donors.service';
 import { CryptoService } from '../common/crypto.service';
 import { OutboxService } from '../common/outbox.service';
 import { smsSafe } from '../common/gsm';
@@ -42,7 +42,7 @@ export class ChannelsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly outbox: OutboxService,
-    private readonly blood: BloodService,
+    private readonly blood: BloodDonorsService,
     private readonly alerts: AlertsService,
     private readonly ticks: TickRegistry,
     private readonly circle: CircleService,
