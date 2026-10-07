@@ -708,13 +708,21 @@ export class BloodService {
     return { ...(await this.get(user, req.id)), reservation: { units, draw, site: siteName, complete } };
   }
 
-  /** Transaction sérialisable ; un conflit de sérialisation (écriture concurrente) devient « réessayez ». */
-  private async serializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
-    try {
-      return await this.prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && (e.code === 'P2034' || e.code === 'P2028')) throw new ConflictException('Une autre opération est en cours sur cette demande. Réessayez.');
-      throw e;
+  /**
+   * Transaction sérialisable, rejouée jusqu'à trois fois en cas de conflit de sérialisation (deux réponses ou deux
+   * réservations au même instant : PostgreSQL en annule une, qui relit l'état et conclut correctement, par exemple
+   * « besoin déjà couvert »). Au-delà, « réessayez ».
+   */
+  private async serializable<T>(fn: (tx: Prisma.TransactionClient) => Promise<T>, attempts = 3): Promise<T> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.prisma.$transaction(fn, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+      } catch (e) {
+        const conflict = e instanceof Prisma.PrismaClientKnownRequestError && (e.code === 'P2034' || e.code === 'P2028');
+        if (!conflict) throw e;
+        if (attempt >= attempts) throw new ConflictException('Une autre opération est en cours sur cette demande. Réessayez.');
+        await new Promise((r) => setTimeout(r, 40 * attempt + Math.floor(Math.random() * 60)));
+      }
     }
   }
 
