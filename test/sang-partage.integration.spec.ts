@@ -126,7 +126,7 @@ describe.skipIf(!process.env.DATABASE_URL)('M4 et M1 · don de sang et partage d
 
         // Le même « 1 » arrive deux fois en même temps : une seule acceptation, un seul SMS de rendez-vous.
         const sms = request(app.getHttpServer());
-        await Promise.all([sms.post('/sms/inbound').send({ from: alert.donor.phone, body: '1' }), sms.post('/sms/inbound').send({ from: alert.donor.phone, body: '1' })]);
+        await Promise.all([sms.post('/sms/inbound').send({ from: alert.donor.phone, body: '1' }).expect(200), sms.post('/sms/inbound').send({ from: alert.donor.phone, body: '1' }).expect(200)]);
         expect((await prisma.donorAlert.findUniqueOrThrow({ where: { id: alert.id } })).status).toBe('ACCEPTEE');
         const rdv = await prisma.outbox.count({ where: { to: alert.donor.phone, ref: `blood-request:${id}`, body: { contains: 'Rendez-vous' } } });
         expect(rdv).toBe(1);

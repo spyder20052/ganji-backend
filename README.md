@@ -30,7 +30,7 @@ npm run dev
 
 | Commande | Effet |
 |----------|-------|
-| `npm test` / `npm run test:cov` | Tests Vitest : règles métier pures (don de sang, ordonnances, commandes, cercle de soins, posologies, i18n, chiffrement) et, **si `DATABASE_URL` est défini**, 4 suites d'intégration sur la vraie base (IDOR, consentement, parcours héros, ordonnance à usage unique, commandes, télé-expertise…). Sans base, ces 35 tests sont ignorés : `docker compose up -d db && npm run db:setup` pour les lancer. |
+| `npm test` / `npm run test:cov` | Tests Vitest : règles métier pures (don de sang, ordonnances, commandes, cercle de soins, posologies, i18n, chiffrement) et, **si `DATABASE_URL` est défini**, 4 suites d'intégration sur la vraie base (IDOR, consentement, parcours héros, ordonnance à usage unique, commandes, télé-expertise…), exécutées l'une après l'autre car elles partagent la base seedée. Sans base, ces 35 tests sont ignorés : `docker compose up -d db && npm run db:setup` pour les lancer. |
 | `npm run lint` / `npm run typecheck` | Qualité |
 | `npm run db:seed` | Réinitialise la démo (déterministe) |
 | `npm run i18n:verify` | Textes SMS, voix et notifications : chaque clé traduite en fon, yoruba, bariba, dendi, mêmes variables |
